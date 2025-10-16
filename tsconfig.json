@@ -14,8 +14,9 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
+    "allowArbitraryExtensions": true,
     "jsx": "react-jsx"
   },
   "include": ["backend", "frontend/src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "exclude": ["**/*.test.ts", "**/*.spec.ts", "node_modules"]
 }
