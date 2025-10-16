@@ -29,9 +29,9 @@ This repository hosts the demo application used to illustrate the contrasting pr
 │   │   ├── rate-limiters/
 │   │   │   ├── token-bucket.js      # Token bucket implementation
 │   │   │   ├── leaky-bucket.js      # Leaky bucket implementation
-│   │   │   ├── fixed-window.js      # Fixed window counter
-│   │   │   ├── sliding-window.js    # Sliding window counter
-│   │   │   └── sliding-log.js       # Sliding log implementation
+│   │   │   ├── fixed-window.js      # Fixed window counter (optional)
+│   │   │   ├── sliding-window.js    # Sliding window counter (optional)
+│   │   │   └── sliding-log.js       # Sliding log implementation (optional)
 │   │   └── limiter-factory.js       # Factory for algorithm instantiation
 │   ├── package.json
 │   └── .gitignore
@@ -53,7 +53,7 @@ Configure the active rate-limiting algorithm and the allowed request rate in req
 **Request Body:**
 ```json
 {
-  "algorithm": "token-bucket",  // One of: "token-bucket", "leaky-bucket", "fixed-window", "sliding-window", "sliding-log"
+  "algorithm": "token-bucket",  // One of (implemented): "token-bucket", "leaky-bucket". Optional if added: "fixed-window", "sliding-window", "sliding-log"
   "rps": 10                     // Requests per second (must be > 0)
 }
 ```
@@ -75,7 +75,7 @@ Configure the active rate-limiting algorithm and the allowed request rate in req
 ```
 
 **Validation Rules:**
-- `algorithm` must be one of the five supported values (exact string match)
+- `algorithm` must be one of: `token-bucket`, `leaky-bucket`. Optional extras (`fixed-window`, `sliding-window`, `sliding-log`) are supported only if implemented.
 - `rps` must be a positive number greater than 0
 
 ### GET `/test`
@@ -118,7 +118,7 @@ class RateLimiter {
 }
 ```
 
-### 1. Token Bucket
+### 1. Token Bucket (Implemented)
 
 **Mechanism:** Maintains a bucket with a maximum capacity of tokens. Tokens are added at a fixed rate (refill). Each request consumes one token. Allows bursts up to bucket capacity.
 
@@ -130,7 +130,7 @@ class RateLimiter {
 
 **Use case:** Systems that tolerate controlled bursts but enforce long-term average rate.
 
-### 2. Leaky Bucket
+### 2. Leaky Bucket (Implemented)
 
 **Mechanism:** Requests are added to a queue (bucket) and processed at a fixed rate (leak rate). If queue is full, requests are rejected.
 
@@ -142,7 +142,7 @@ class RateLimiter {
 
 **Use case:** Systems requiring smooth, predictable output rate regardless of input spikes.
 
-### 3. Fixed Window
+### 3. Fixed Window (Optional)
 
 **Mechanism:** Counts requests in fixed time windows (e.g., 0-1s, 1-2s). Counter resets at window boundaries.
 
@@ -154,7 +154,7 @@ class RateLimiter {
 
 **Use case:** Simple implementation where boundary burst is acceptable trade-off.
 
-### 4. Sliding Window
+### 4. Sliding Window (Optional)
 
 **Mechanism:** Divides time into small segments. Calculates weighted average of current + previous window to smooth boundary effects.
 
@@ -166,7 +166,7 @@ class RateLimiter {
 
 **Use case:** Balance between accuracy and efficiency, reduced boundary bursts vs. fixed window.
 
-### 5. Sliding Log
+### 5. Sliding Log (Optional)
 
 **Mechanism:** Maintains a log of exact request timestamps. Counts requests within the sliding time window by filtering expired entries.
 
@@ -196,20 +196,20 @@ LEAKY_BUCKET_DRAIN_INTERVAL_MS = 50      // Request processing tick rate
 ```
 **Trade-off:** Larger queue = more buffering, higher memory; faster drain = smoother output.
 
-### Fixed Window
+### Fixed Window (Optional)
 ```javascript
 FIXED_WINDOW_SIZE_MS = 1000              // Window duration (reset period)
 ```
 **Trade-off:** Smaller window = more frequent resets, higher boundary burst risk.
 
-### Sliding Window
+### Sliding Window (Optional)
 ```javascript
 SLIDING_WINDOW_SIZE_MS = 1000            // Total window duration
 SLIDING_WINDOW_SEGMENTS = 10             // Sub-window count (100ms each)
 ```
 **Trade-off:** More segments = smoother rate enforcement, higher memory/CPU cost.
 
-### Sliding Log
+### Sliding Log (Optional)
 ```javascript
 SLIDING_LOG_WINDOW_MS = 1000             // Tracking window duration
 SLIDING_LOG_MAX_ENTRIES = 10000          // Maximum log size (prevents memory leak)
@@ -221,12 +221,12 @@ SLIDING_LOG_MAX_ENTRIES = 10000          // Maximum log size (prevents memory le
 ### Configuration Panel
 
 **Components:**
-1. **Algorithm Selector**: Dropdown with 5 options
-   - Token Bucket
-   - Leaky Bucket
-   - Fixed Window
-   - Sliding Window
-   - Sliding Log
+1. **Algorithm Selector**: Dropdown with implemented options (2 required)
+   - Token Bucket (Implemented)
+   - Leaky Bucket (Implemented)
+   - Fixed Window (Optional)
+   - Sliding Window (Optional)
+   - Sliding Log (Optional)
 
 2. **RPS Input**: Numeric input field
    - Range: 1 - 1000
@@ -322,7 +322,7 @@ During local development, the frontend runs at `http://localhost:5173`. Configur
 Use the front end to toggle algorithms and rates, then observe responses from the test endpoint to compare strategies side by side.
 
 **Recommended Test Scenarios:**
-1. **Boundary Burst Test**: Fire 20 requests at window transition for Fixed Window vs. Sliding Window
+1. **Burst vs Smooth**: Fire 50 requests instantly and compare Token Bucket vs. Leaky Bucket behavior
 2. **Sustained Load**: Continuous requests at 1.5× configured RPS to observe rejection patterns
 3. **Burst Recovery**: Fire 50 requests instantly, wait 2 seconds, fire 50 more (Token vs. Leaky)
-4. **Precision Test**: Sliding Log vs. Sliding Window under exact RPS load
+4. **Optional Precision Test**: Sliding Log vs. Sliding Window under exact RPS load (if implemented)
