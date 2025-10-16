@@ -1,6 +1,6 @@
-# Fox vs. Hedgehog Rate Limiting Demo
+# Fox vs. Hedgehog Rate Limiting Demo - Specification
 
-This repository hosts the demo application used to illustrate the contrasting problem-solving approaches of the fox and the hedgehog. The project centers on a rate limiting scenario that highlights how each mindset explores or commits to a strategy when taming bursty traffic.
+This document specifies the requirements for a demo application that illustrates the contrasting problem-solving approaches of the fox and the hedgehog. The project centers on a rate limiting scenario that highlights how each mindset explores or commits to a strategy when taming bursty traffic.
 
 ## Application Overview
 
@@ -37,9 +37,10 @@ This repository hosts the demo application used to illustrate the contrasting pr
 │   └── .gitignore
 │
 ├── frontend/
-│   ├── index.html                   # Single-page application
-│   ├── app.ts                       # Client-side logic
-│   └── styles.css                   # UI styling
+│   ├── src/
+│   │   ├── main.ts                  # Client-side logic
+│   │   └── style.css                # UI styling
+│   └── index.html                   # Single-page application
 │
 └── README.md
 ```
@@ -53,7 +54,7 @@ Configure the active rate-limiting algorithm and the allowed request rate in req
 **Request Body:**
 ```json
 {
-  "algorithm": "token-bucket",  // One of (implemented): "token-bucket", "leaky-bucket". Optional if added: "fixed-window", "sliding-window", "sliding-log"
+  "algorithm": "token-bucket",  // One of: "token-bucket", "leaky-bucket". Optional if added: "fixed-window", "sliding-window", "sliding-log"
   "rps": 10                     // Requests per second (must be > 0)
 }
 ```
@@ -158,18 +159,24 @@ No response body is returned. Success is indicated by the 204 status code.
 
 ## Rate Limiting Algorithms
 
-All algorithms implement a common interface with the following contract:
+All algorithms SHALL implement a common interface with the following contract.
+
+**Location:** `backend/src/types/rate-limiter.interface.ts`
 
 ```ts
-class RateLimiter {
-  constructor(rps: number) {}            // Initialize with requests per second
-  allow(): boolean                        // Returns boolean (true = allow, false = reject)
-  reset(): void                           // Clear internal state
-  getStats(): { remaining: number; resetAt: number } // Returns { remaining, resetAt }
+interface RateLimiter {
+  allow(): boolean;                       // Returns boolean (true = allow, false = reject)
+  reset(): void;                          // Clear internal state
+  getStats(): { remaining: number; resetAt: number }; // Returns { remaining, resetAt }
 }
 ```
 
-### 1. Token Bucket (Implemented)
+Each implementation SHALL:
+- Accept `rps: number` in its constructor
+- Implement all three methods defined in the interface
+- Maintain internal state for rate limiting calculations
+
+### 1. Token Bucket
 
 **Mechanism:** Maintains a bucket with a maximum capacity of tokens. Tokens are added at a fixed rate (refill). Each request consumes one token. Allows bursts up to bucket capacity.
 
@@ -181,7 +188,7 @@ class RateLimiter {
 
 **Use case:** Systems that tolerate controlled bursts but enforce long-term average rate.
 
-### 2. Leaky Bucket (Implemented)
+### 2. Leaky Bucket
 
 **Mechanism:** Requests are added to a queue (bucket) and processed at a fixed rate (leak rate). If queue is full, requests are rejected.
 
@@ -267,14 +274,26 @@ SLIDING_LOG_MAX_ENTRIES = 10000          // Maximum log size (prevents memory le
 ```
 **Trade-off:** Larger max entries = supports higher burst rates, more memory consumption.
 
+## Environment Configuration
+
+### Backend Configuration
+The backend SHALL support the following environment variables:
+- `BACKEND_PORT`: Port for API server (default: 9000)
+- `CORS_ORIGIN`: Allowed frontend origin (default: http://localhost:5173)
+
+### Frontend Configuration
+The frontend SHALL support the following environment variables:
+- `VITE_API_URL`: Backend API base URL (default: http://localhost:9000)
+- `VITE_PORT`: Frontend dev server port (default: 5173)
+
 ## Frontend Specification
 
 ### Configuration Panel
 
 **Components:**
-1. **Algorithm Selector**: Dropdown with implemented options (2 required)
-   - Token Bucket (Implemented)
-   - Leaky Bucket (Implemented)
+1. **Algorithm Selector**: Dropdown with available options (minimum 2 required)
+   - Token Bucket
+   - Leaky Bucket
    - Fixed Window (Optional)
    - Sliding Window (Optional)
    - Sliding Log (Optional)
@@ -394,3 +413,143 @@ Use the front end to toggle algorithms and rates, then observe responses from th
 2. **Sustained Load**: Continuous requests at 1.5× configured RPS to observe rejection patterns
 3. **Burst Recovery**: Fire 50 requests instantly, wait 2 seconds, fire 50 more (Token vs. Leaky)
 4. **Optional Precision Test**: Sliding Log vs. Sliding Window under exact RPS load (if implemented)
+
+### Algorithm Validation & Testing
+
+#### Test Execution Requirements
+
+The algorithm validation suite SHALL be executable from the project root:
+
+```bash
+bun run backend/test-algorithms.ts
+```
+
+**Required Test Coverage:**
+The test suite MUST validate:
+- Burst capacity validation (Token Bucket: 20 tokens, Leaky Bucket: 15 queue slots @ 10 RPS)
+- Reset functionality (state clears correctly)
+- Time-based refill/drain behavior
+- Sustained rate enforcement over time
+- Recovery after exhaustion
+
+#### Validation Test Scenarios
+
+The following scenarios SHALL be used to validate that each algorithm behaves according to its design specification:
+
+##### Test 1: Burst Capacity (Instant Load)
+
+**Configuration:** 10 RPS
+**Action:** Fire 25 requests instantly (0ms delay)
+
+| Algorithm | Required Behavior | Validates |
+|-----------|-------------------|-----------|
+| Token Bucket | MUST allow 20/25 requests, MUST reject 5/25 requests | Burst capacity = rps × 2.0 = 20 tokens |
+| Leaky Bucket | MUST allow 15/25 requests, MUST reject 10/25 requests | Queue size = rps × 1.5 = 15 slots |
+
+**Why different:** Token Bucket starts with full capacity; Leaky Bucket has smaller queue buffer.
+
+##### Test 2: Rate Enforcement (Sustained Load)
+
+**Configuration:** 10 RPS
+**Action:** Fire 100 requests with 100ms delay between each (simulates 10 RPS load)
+
+| Algorithm | Required Behavior | Validates |
+|-----------|-------------------|-----------|
+| Token Bucket | MUST allow ~100/100 requests | Long-term rate adherence after initial burst |
+| Leaky Bucket | MUST allow ~100/100 requests | Steady-state processing at configured rate |
+
+**Why same:** Both enforce the configured rate over sustained periods.
+
+##### Test 3: Recovery After Exhaustion
+
+**Configuration:** 10 RPS
+**Action:** Fire 25 requests instantly → Wait 1 second → Fire 15 requests
+
+| Algorithm | Required Behavior | Validates |
+|-----------|-------------------|-----------|
+| Token Bucket | Burst 1: MUST allow 20/25<br>Wait 1s: MUST refill 10 tokens<br>Burst 2: MUST allow 10/15 | Refill rate = 10 tokens/second |
+| Leaky Bucket | Burst 1: MUST allow 15/25<br>Wait 1s: MUST drain ~10 items<br>Burst 2: MUST allow 10/15 | Drain rate = 10 items/second |
+
+**Why different:** Token Bucket refills tokens; Leaky Bucket drains queue to create space.
+
+##### Test 4: Full Recovery After Idle Period
+
+**Configuration:** 10 RPS
+**Action:** Fire 25 requests instantly → Wait 2 seconds → Fire 25 requests
+
+| Algorithm | Required Behavior | Validates |
+|-----------|-------------------|-----------|
+| Token Bucket | Burst 1: MUST allow 20/25<br>Wait 2s: MUST fully refill to 20<br>Burst 2: MUST allow 20/25 | Complete capacity restoration |
+| Leaky Bucket | Burst 1: MUST allow 15/25<br>Wait 2s: Queue MUST be fully drained<br>Burst 2: MUST allow 15/25 | Complete queue clearance |
+
+**Why same pattern:** Both algorithms fully recover after sufficient idle time.
+
+##### Test 5: Low Rate Configuration
+
+**Configuration:** 1 RPS
+**Action:** Fire 5 requests instantly
+
+| Algorithm | Required Behavior | Validates |
+|-----------|-------------------|-----------|
+| Token Bucket | MUST allow 2/5 requests | Capacity = 1 × 2.0 = 2 tokens |
+| Leaky Bucket | MUST allow 1/5 requests | Queue = 1 × 1.5 = 1 slot (rounded down) |
+
+**Why different:** Multipliers scale correctly even at low rates.
+
+##### Test 6: High Rate Configuration
+
+**Configuration:** 100 RPS
+**Action:** Fire 500 requests instantly
+
+| Algorithm | Required Behavior | Validates |
+|-----------|-------------------|-----------|
+| Token Bucket | MUST allow 200/500 requests | Capacity = 100 × 2.0 = 200 tokens |
+| Leaky Bucket | MUST allow 150/500 requests | Queue = 100 × 1.5 = 150 slots |
+
+**Why different:** Burst tolerance scales proportionally with configured rate.
+
+#### Expected Behavioral Differences
+
+| Characteristic | Token Bucket | Leaky Bucket |
+|----------------|--------------|--------------|
+| **Initial State** | Full (20 tokens @ 10 RPS) | Empty (0 items in queue) |
+| **Burst Handling** | Allows immediate burst up to capacity | Caps burst at queue size |
+| **Recovery Mechanism** | Adds tokens over time | Drains queue over time |
+| **Burst Tolerance** | High (2.0× multiplier) | Medium (1.5× multiplier) |
+| **Best For** | APIs tolerating controlled bursts | Systems requiring smooth output rates |
+| **Interval Granularity** | 100ms refill intervals | 50ms drain intervals |
+
+#### Implementation Notes
+
+**Timing Precision:**
+- Token Bucket refills in 100ms intervals (configurable via `TOKEN_BUCKET_REFILL_INTERVAL_MS`)
+- Leaky Bucket drains in 50ms intervals (configurable via `LEAKY_BUCKET_DRAIN_INTERVAL_MS`)
+- Both use interval-based calculations to prevent drift over time
+
+**State Management:**
+- Token Bucket tracks: `tokens`, `lastRefill` timestamp
+- Leaky Bucket tracks: `queueCount`, `lastDrain` timestamp
+- Both implement lazy evaluation (calculate on each `allow()` call)
+
+## Deployment Notes
+
+### Purpose
+This is a demonstration application designed to visually illustrate rate limiting algorithms.
+The frontend intentionally does not handle network failures to maintain focus on rate limiting behavior.
+
+### Build Process
+- Frontend: Bundle with Vite for production
+- Backend: Compile TypeScript to JavaScript
+- Output directories: `frontend/dist`, `backend/dist`
+
+## Conformance Requirements
+
+A compliant implementation MUST:
+1. Implement both Token Bucket and Leaky Bucket algorithms
+2. Support all specified API endpoints with exact response formats
+3. Pass all validation test scenarios defined in this specification
+4. Maintain rate limiter state consistency across requests
+5. Provide accurate rate limit headers in all responses
+6. Implement the RateLimiter interface as specified
+7. Support configuration via environment variables as documented
+8. Respect the algorithm configuration constants and their multipliers
