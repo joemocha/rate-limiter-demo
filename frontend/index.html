@@ -4,10 +4,56 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>Rate Limiting Demo - Fox vs Hedgehog</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <h1>Rate Limiting Demo</h1>
+
+      <section id="config-panel" class="panel">
+        <h2>Configuration</h2>
+        <div class="form-group">
+          <label for="algorithm">Algorithm:</label>
+          <select id="algorithm">
+            <option value="token-bucket">Token Bucket</option>
+            <option value="leaky-bucket">Leaky Bucket</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="rps">Requests Per Second:</label>
+          <input type="number" id="rps" min="1" max="1000" value="10" />
+        </div>
+        <button id="apply-config">Apply Configuration</button>
+        <div id="config-status"></div>
+      </section>
+
+      <section id="burst-panel" class="panel">
+        <h2>Burst Generator</h2>
+        <div class="form-group">
+          <label for="request-count">Number of Requests:</label>
+          <input type="number" id="request-count" min="1" max="100" value="10" />
+        </div>
+        <div class="form-group">
+          <label for="request-delay">Delay Between Requests (ms):</label>
+          <input type="number" id="request-delay" min="0" max="1000" value="0" />
+        </div>
+        <button id="fire-burst">Fire Burst</button>
+      </section>
+
+      <section id="results-panel" class="panel">
+        <h2>Results</h2>
+        <div id="statistics">
+          <div>Total: <span id="stat-total">0</span></div>
+          <div>Allowed: <span id="stat-allowed">0</span> (<span id="stat-allowed-pct">0%</span>)</div>
+          <div>Rejected: <span id="stat-rejected">0</span> (<span id="stat-rejected-pct">0%</span>)</div>
+        </div>
+        <div id="progress-bar">
+          <div id="progress-allowed"></div>
+          <div id="progress-rejected"></div>
+        </div>
+        <div id="request-log"></div>
+      </section>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
