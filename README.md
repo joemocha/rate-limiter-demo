@@ -105,6 +105,57 @@ Receive client requests to evaluate how the current configuration reacts under l
 - `X-RateLimit-Reset`: Unix timestamp when the rate limit resets
 - `Retry-After`: (429 only) Seconds until retry is recommended
 
+### GET `/health`
+
+Server health check endpoint that provides real-time status and rate limiting configuration.
+
+**Response 200 (Success):**
+```json
+{
+  "status": "ok",
+  "algorithm": "token-bucket",
+  "rps": 10,
+  "timestamp": 1697123456789,
+  "stats": {
+    "remaining": 18,
+    "resetAt": 1697123460000
+  }
+}
+```
+
+**Response Fields:**
+- `status`: Server health status (always "ok" when server is running)
+- `algorithm`: Currently active rate limiting algorithm
+- `rps`: Configured requests per second limit
+- `timestamp`: Current server time (Unix timestamp in milliseconds)
+- `stats.remaining`: Available capacity (tokens for Token Bucket, queue slots for Leaky Bucket)
+- `stats.resetAt`: Unix timestamp (in milliseconds) when the rate limiter resets or next processes requests
+
+**Use Cases:**
+- Browser-based health monitoring (check if server is alive)
+- Dashboard displays of current rate limiting state
+- Debugging rate limiter behavior in real-time
+- Integration health checks for load balancers
+
+### POST `/reset`
+
+Manually reset the rate limiter to its initial state, clearing all accumulated state (tokens, queue, timestamps).
+
+**Request Body:** None required
+
+**Response 204 (No Content):**
+No response body is returned. Success is indicated by the 204 status code.
+
+**Effect by Algorithm:**
+- **Token Bucket**: Refills the bucket to full capacity (capacity = rps × burst multiplier)
+- **Leaky Bucket**: Clears the queue to empty, resets drain timestamp
+
+**Use Cases:**
+- Testing different scenarios from a clean state
+- Recovering from test bursts without restarting the server
+- Quick reset between algorithm comparisons
+- Resetting state during development and debugging
+
 ## Rate Limiting Algorithms
 
 All algorithms implement a common interface with the following contract:
@@ -283,6 +334,9 @@ SLIDING_LOG_MAX_ENTRIES = 10000          // Maximum log size (prevents memory le
 ### Installation
 
 ```bash
+# Install root dependencies (concurrently for running both servers)
+bun install
+
 # Install backend dependencies
 cd backend
 bun install
@@ -294,17 +348,29 @@ bun install
 
 ### Running the Application
 
-**Backend:**
+**Recommended: Start Both Servers**
+
+From the project root:
+```bash
+bun run dev:all      # Runs backend + frontend concurrently
+```
+
+This starts both the Hono backend (port 9000) and Vite frontend (port 5173) simultaneously.
+
+**Alternative: Run Separately**
+
+If you prefer to run servers in separate terminals:
+
+Backend:
 ```bash
 cd backend
 bun run dev          # Starts Hono server on port 9000 with hot reload
 ```
 
-**Frontend:**
-Start the Vite dev server:
+Frontend:
 ```bash
 cd frontend
-bun run dev
+bun run dev          # Starts Vite dev server
 ```
 
 Access the application at `http://localhost:5173` (or your chosen frontend port).
