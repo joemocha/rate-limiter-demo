@@ -214,19 +214,32 @@ Each implementation SHALL:
 
 ### 4. Sliding Window (Optional)
 
-**Mechanism:** Divides time into small segments. Calculates weighted average of current + previous window to smooth boundary effects.
+**Mechanism:** Divides time into small segments. Calculates weighted sum of request counts across segments to smooth boundary effects.
+
+**Weighting Formula:**
+- **Current segment** (where time = now): Weight = 1.0 (counted fully)
+- **Previous segments**: Weight = 1 - (age_in_segments / total_segments)
+  - Example: In a 10-segment window, a segment 3 positions old has weight = 1 - (3/10) = 0.7
+  - Segments older than the window size have weight = 0
+
+**Implementation Note:** The current partial segment is counted at full weight because it represents requests happening "now" within the current rate limit window.
 
 **Characteristics:**
 - **Burst tolerance**: Low (distributed across window)
 - **Boundary effects**: Low (weighted smoothing reduces edge bursts)
 - **Memory**: O(segments) - stores counts per segment
-- **CPU**: O(1) per request (weighted sum calculation)
+- **CPU**: O(segments) per request (weighted sum calculation)
 
 **Use case:** Balance between accuracy and efficiency, reduced boundary bursts vs. fixed window.
 
 ### 5. Sliding Log (Optional)
 
 **Mechanism:** Maintains a log of exact request timestamps. Counts requests within the sliding time window by filtering expired entries.
+
+**Memory Management:**
+- **MUST check memory limit BEFORE adding entries**: `if (log.length >= MAX_ENTRIES) reject()`
+- **Never allow log to exceed MAX_ENTRIES** even temporarily
+- The check prevents the log from ever reaching MAX_ENTRIES + 1
 
 **Characteristics:**
 - **Burst tolerance**: None (precise enforcement)
@@ -508,6 +521,21 @@ The following scenarios SHALL be used to validate that each algorithm behaves ac
 
 **Why different:** Burst tolerance scales proportionally with configured rate.
 
+##### Test 7: Sliding Window Weighted Sum (Optional)
+
+**Configuration:** 10 RPS with 10 segments (100ms each)
+**Action:**
+1. Fire 5 requests instantly
+2. Wait 300ms (3 segments)
+3. Fire 5 more requests
+4. Verify weighted sum calculation
+
+| Algorithm | Required Behavior | Validates |
+|-----------|-------------------|-----------|
+| Sliding Window | First burst: 5 requests in segment 0<br>After 300ms: Segment 0 has weight = 0.7<br>Weighted count = 5 × 0.7 = 3.5<br>Second burst should allow 5 requests (total weighted < 10) | Correct segment weighting implementation |
+
+**Purpose:** Verifies that segments are weighted correctly based on age, with current segment at full weight.
+
 #### Expected Behavioral Differences
 
 | Characteristic | Token Bucket | Leaky Bucket |
@@ -524,12 +552,49 @@ The following scenarios SHALL be used to validate that each algorithm behaves ac
 **Timing Precision:**
 - Token Bucket refills in 100ms intervals (configurable via `TOKEN_BUCKET_REFILL_INTERVAL_MS`)
 - Leaky Bucket drains in 50ms intervals (configurable via `LEAKY_BUCKET_DRAIN_INTERVAL_MS`)
-- Both use interval-based calculations to prevent drift over time
+- **CRITICAL**: Both MUST align timestamps to interval boundaries to prevent drift:
+  ```typescript
+  // CORRECT - Prevents timing drift
+  this.lastRefill = this.lastRefill + (intervalsElapsed * INTERVAL_MS);
+
+  // INCORRECT - Accumulates timing errors
+  this.lastRefill = now;
+  ```
+- This alignment ensures consistent behavior under sustained load
 
 **State Management:**
 - Token Bucket tracks: `tokens`, `lastRefill` timestamp
 - Leaky Bucket tracks: `queueCount`, `lastDrain` timestamp
 - Both implement lazy evaluation (calculate on each `allow()` call)
+
+## Common Implementation Pitfalls
+
+This section documents common mistakes to avoid when implementing the rate limiting algorithms:
+
+### Token Bucket & Leaky Bucket
+- **Timing Drift**: Using `now` instead of interval-aligned timestamps causes accumulating timing errors
+  - ❌ Wrong: `this.lastRefill = Date.now()`
+  - ✅ Correct: `this.lastRefill = this.lastRefill + (intervals * INTERVAL_MS)`
+
+### Sliding Window
+- **Current Segment Weighting**: The current segment should be counted at full weight (1.0), not partially weighted
+  - ❌ Wrong: Weight current segment by elapsed time
+  - ✅ Correct: Current segment weight = 1.0 (it represents "now")
+
+### Sliding Log
+- **Memory Bound Check Order**: Check MUST occur before adding new entries
+  - ❌ Wrong: Add first, then check and remove if over limit
+  - ✅ Correct: Check if at limit, reject if would exceed
+
+### Fixed Window
+- **Boundary Burst**: This is expected behavior (not a bug) - document it clearly
+  - Can allow 2× rate at window boundaries
+  - Example: 10 RPS can burst to 20 requests in 2ms at boundary
+
+### General
+- **Integer vs Float RPS**: Decide how to handle fractional RPS values
+- **Concurrent Access**: For teaching demos, global state is acceptable
+- **Performance vs Correctness**: For demos, prioritize algorithmic correctness over optimization
 
 ## Deployment Notes
 
