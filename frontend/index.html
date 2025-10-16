@@ -2,12 +2,129 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>Rate Limiting Demo: Fox vs. Hedgehog</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <header>
+        <h1>Rate Limiting Algorithms Demo</h1>
+        <p>Explore how different rate limiting strategies handle bursty traffic</p>
+      </header>
+
+      <main>
+        <!-- Configuration Panel -->
+        <section id="config-section" class="section">
+          <h2>Configuration</h2>
+          <div class="config-panel">
+            <div class="form-group">
+              <label for="algorithm">Algorithm:</label>
+              <select id="algorithm" class="select-input">
+                <option value="token-bucket">Token Bucket</option>
+                <option value="leaky-bucket">Leaky Bucket</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="rps">Requests Per Second:</label>
+              <input
+                id="rps"
+                type="number"
+                min="1"
+                max="1000"
+                value="10"
+                class="input"
+              />
+            </div>
+
+            <button id="apply-btn" class="btn btn-primary">Apply Settings</button>
+            <div id="status-message" class="status-message"></div>
+          </div>
+
+          <div id="current-config" class="current-config">
+            <p>Current: <span id="current-algo">token-bucket</span> @ <span id="current-rps">10</span> RPS</p>
+          </div>
+        </section>
+
+        <!-- Burst Generator -->
+        <section id="burst-section" class="section">
+          <h2>Burst Generator</h2>
+          <div class="burst-panel">
+            <div class="form-group">
+              <label for="request-count">Number of Requests:</label>
+              <input
+                id="request-count"
+                type="number"
+                min="1"
+                max="100"
+                value="10"
+                class="input"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="request-delay">Delay Between Requests (ms):</label>
+              <input
+                id="request-delay"
+                type="number"
+                min="0"
+                max="1000"
+                value="0"
+                class="input"
+              />
+            </div>
+
+            <button id="fire-btn" class="btn btn-success">Fire Burst</button>
+          </div>
+        </section>
+
+        <!-- Results Display -->
+        <section id="results-section" class="section">
+          <h2>Results</h2>
+
+          <!-- Statistics -->
+          <div class="stats-container">
+            <div class="stat-item">
+              <span class="stat-label">Total Requests:</span>
+              <span id="stat-total" class="stat-value">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Allowed:</span>
+              <span id="stat-allowed" class="stat-value allowed">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Rejected:</span>
+              <span id="stat-rejected" class="stat-value rejected">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Success Rate:</span>
+              <span id="stat-rate" class="stat-value">0%</span>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="progress-bar">
+            <div id="progress-allowed" class="progress-segment allowed"></div>
+            <div id="progress-rejected" class="progress-segment rejected"></div>
+          </div>
+
+          <!-- Request Log -->
+          <div class="log-container">
+            <h3>Request Log</h3>
+            <div id="request-log" class="request-log">
+              <p class="placeholder">No requests yet. Fire a burst to see results.</p>
+            </div>
+          </div>
+
+          <!-- Control Buttons -->
+          <div class="button-group">
+            <button id="reset-btn" class="btn btn-secondary">Reset Limiter</button>
+            <button id="clear-log-btn" class="btn btn-secondary">Clear Log</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
