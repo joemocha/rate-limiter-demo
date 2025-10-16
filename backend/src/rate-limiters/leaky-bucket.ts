@@ -43,7 +43,7 @@ export class LeakyBucket implements RateLimiter {
     if (intervalsElapsed > 0) {
       const itemsToDrain = Math.floor((this.drainRate / 1000) * (intervalsElapsed * LEAKY_BUCKET_DRAIN_INTERVAL_MS));
       this.queueCount = Math.max(0, this.queueCount - itemsToDrain);
-      this.lastDrain += intervalsElapsed * LEAKY_BUCKET_DRAIN_INTERVAL_MS;
+      this.lastDrain = now; // Fix: Set to current time instead of accumulating
     }
   }
 }

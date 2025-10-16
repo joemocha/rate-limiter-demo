@@ -5,6 +5,10 @@ import { RateLimiter } from "./types/rate-limiter.interface";
 
 const app = new Hono();
 
+// Environment configuration
+const BACKEND_PORT = parseInt(process.env.BACKEND_PORT || "9000", 10);
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
+
 // Global state
 let currentAlgorithm: AlgorithmType = "token-bucket";
 let currentRps = 10;
@@ -14,7 +18,7 @@ let rateLimiter: RateLimiter = LimiterFactory.create(currentAlgorithm, currentRp
 app.use(
   "*",
   cors({
-    origin: "http://localhost:5173",
+    origin: CORS_ORIGIN,
     allowMethods: ["GET", "POST", "OPTIONS"],
     allowHeaders: ["Content-Type"],
     exposeHeaders: ["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Retry-After"],
@@ -51,58 +55,73 @@ app.post("/settings", async (c) => {
 
 // GET /test
 app.get("/test", (c) => {
-  const allowed = rateLimiter.allow();
-  const stats = rateLimiter.getStats();
+  try {
+    const allowed = rateLimiter.allow();
+    const stats = rateLimiter.getStats();
 
-  // Set rate limit headers
-  c.header("X-RateLimit-Limit", currentRps.toString());
-  c.header("X-RateLimit-Remaining", stats.remaining.toString());
-  c.header("X-RateLimit-Reset", stats.resetAt.toString());
-  c.header("Cache-Control", "no-store");
+    // Set rate limit headers
+    c.header("X-RateLimit-Limit", currentRps.toString());
+    c.header("X-RateLimit-Remaining", stats.remaining.toString());
+    c.header("X-RateLimit-Reset", stats.resetAt.toString());
+    c.header("Cache-Control", "no-store");
 
-  if (!allowed) {
-    const retryAfter = Math.max(0, stats.resetAt - Date.now());
-    c.header("Retry-After", Math.ceil(retryAfter / 1000).toString());
+    if (!allowed) {
+      const retryAfter = Math.max(0, stats.resetAt - Date.now());
+      c.header("Retry-After", Math.ceil(retryAfter / 1000).toString());
 
-    return c.json(
-      {
-        allowed: false,
-        retryAfter,
-      },
-      429
-    );
+      return c.json(
+        {
+          allowed: false,
+          retryAfter,
+        },
+        429
+      );
+    }
+
+    return c.json({
+      allowed: true,
+      remaining: stats.remaining,
+      resetAt: stats.resetAt,
+    });
+  } catch (error) {
+    console.error("Error in /test endpoint:", error);
+    return c.json({ error: "Internal server error" }, 500);
   }
-
-  return c.json({
-    allowed: true,
-    remaining: stats.remaining,
-    resetAt: stats.resetAt,
-  });
 });
 
 // GET /health
 app.get("/health", (c) => {
-  const stats = rateLimiter.getStats();
+  try {
+    const stats = rateLimiter.getStats();
 
-  return c.json({
-    status: "ok",
-    algorithm: currentAlgorithm,
-    rps: currentRps,
-    timestamp: Date.now(),
-    stats: {
-      remaining: stats.remaining,
-      resetAt: stats.resetAt,
-    },
-  });
+    return c.json({
+      status: "ok",
+      algorithm: currentAlgorithm,
+      rps: currentRps,
+      timestamp: Date.now(),
+      stats: {
+        remaining: stats.remaining,
+        resetAt: stats.resetAt,
+      },
+    });
+  } catch (error) {
+    console.error("Error in /health endpoint:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
 });
 
 // POST /reset
 app.post("/reset", (c) => {
-  rateLimiter.reset();
-  return c.text("", 204);
+  try {
+    rateLimiter.reset();
+    return c.text("", 204);
+  } catch (error) {
+    console.error("Error in /reset endpoint:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
 });
 
 export default {
-  port: 9000,
+  port: BACKEND_PORT,
   fetch: app.fetch,
 };

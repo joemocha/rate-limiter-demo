@@ -64,23 +64,35 @@ export class SlidingWindow implements RateLimiter {
     const now = Date.now();
     const currentSegmentElapsed = (now - this.currentSegmentStart) / this.segmentDuration;
 
-    // Sum all segments with appropriate weights
-    let total = 0;
+    // Get the immediately previous segment (age = 1)
+    const prevSegmentIndex = (this.currentSegmentIndex - 1 + SLIDING_WINDOW_SEGMENTS) % SLIDING_WINDOW_SEGMENTS;
+
+    // Sliding window counter algorithm:
+    // - Previous complete segment weighted by how much still overlaps with sliding window
+    // - Current segment counted fully (represents requests happening "now")
+    // - Other segments summed fully if within the window range
+    const weightedSum =
+      this.segments[prevSegmentIndex] * (1 - currentSegmentElapsed) +
+      this.segments[this.currentSegmentIndex] +
+      this.sumOtherSegments();
+
+    return weightedSum;
+  }
+
+  private sumOtherSegments(): number {
+    // Sum segments with age-based weighting for smoother rate limiting
+    // Segments further back in time contribute less to the current count
+    let sum = 0;
     for (let i = 0; i < SLIDING_WINDOW_SEGMENTS; i++) {
-      if (i === this.currentSegmentIndex) {
-        // Current segment - partial weight based on elapsed time
-        total += this.segments[i];
-      } else {
-        // Previous segments - check if they're within the window
-        const segmentAge = this.getSegmentAge(i);
-        if (segmentAge < SLIDING_WINDOW_SEGMENTS) {
-          const weight = Math.max(0, 1 - (segmentAge / SLIDING_WINDOW_SEGMENTS));
-          total += this.segments[i] * weight;
-        }
+      const age = this.getSegmentAge(i);
+      if (age >= 2 && age < SLIDING_WINDOW_SEGMENTS) {
+        // Linear decay: segments at the far edge of the window contribute proportionally less
+        // Example: at age=5 in a 10-segment window, weight = 1 - 5/10 = 0.5
+        const weight = 1 - (age / SLIDING_WINDOW_SEGMENTS);
+        sum += this.segments[i] * weight;
       }
     }
-
-    return total;
+    return sum;
   }
 
   private getSegmentAge(index: number): number {
