@@ -224,10 +224,10 @@ describe("Fixed Window Algorithm", () => {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Fixed Window implementation compiles: `cd backend && bun run build`
-- [ ] Fixed Window unit tests pass: `cd backend && bun test --grep "Fixed Window"`
-- [ ] Type checking passes: `cd backend && bun run typecheck`
-- [ ] No linting errors: `cd backend && bun run lint`
+- [x] Fixed Window implementation compiles: `cd backend && bun run build`
+- [x] Fixed Window unit tests pass: `cd backend && bun test --grep "Fixed Window"`
+- [x] Type checking passes: `cd backend && bun run typecheck`
+- [x] No linting errors: `cd backend && bun run lint`
 
 #### Manual Verification:
 - [ ] Fixed Window shows no burst tolerance (exact RPS limit)
@@ -462,10 +462,10 @@ describe("Sliding Window Algorithm", () => {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Sliding Window implementation compiles: `cd backend && bun run build`
-- [ ] Sliding Window unit tests pass: `cd backend && bun test --grep "Sliding Window"`
-- [ ] Type checking passes: `cd backend && bun run typecheck`
-- [ ] No linting errors: `cd backend && bun run lint`
+- [x] Sliding Window implementation compiles: `cd backend && bun run build`
+- [x] Sliding Window unit tests pass: `cd backend && bun test --grep "Sliding Window"`
+- [x] Type checking passes: `cd backend && bun run typecheck`
+- [x] No linting errors: `cd backend && bun run lint`
 
 #### Manual Verification:
 - [ ] Sliding Window shows low burst tolerance (distributed across segments)
@@ -692,11 +692,11 @@ describe("Sliding Log Algorithm", () => {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Sliding Log implementation compiles: `cd backend && bun run build`
-- [ ] Sliding Log unit tests pass: `cd backend && bun test --grep "Sliding Log"`
-- [ ] Type checking passes: `cd backend && bun run typecheck`
-- [ ] No linting errors: `cd backend && bun run lint`
-- [ ] Max entries limit test passes
+- [x] Sliding Log implementation compiles: `cd backend && bun run build`
+- [x] Sliding Log unit tests pass: `cd backend && bun test --grep "Sliding Log"`
+- [x] Type checking passes: `cd backend && bun run typecheck`
+- [x] No linting errors: `cd backend && bun run lint`
+- [x] Max entries limit test passes
 
 #### Manual Verification:
 - [ ] Sliding Log shows zero burst tolerance (precise enforcement)
@@ -782,12 +782,12 @@ The existing integration tests should automatically work once the factory is upd
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] All unit tests pass: `cd backend && bun test`
-- [ ] Integration tests pass: `cd backend && bun test test-integration.test.ts`
-- [ ] Build succeeds: `cd backend && bun run build`
-- [ ] Type checking passes: `cd backend && bun run typecheck`
-- [ ] Linting passes: `cd backend && bun run lint`
-- [ ] Frontend builds: `cd frontend && npm run build`
+- [x] All unit tests pass: `cd backend && bun test`
+- [x] Integration tests pass: `cd backend && bun test test-integration.test.ts`
+- [x] Build succeeds: `cd backend && bun run build`
+- [x] Type checking passes: `cd backend && bun run typecheck`
+- [x] Linting passes: `cd backend && bun run lint`
+- [x] Frontend builds: `cd frontend && npm run build`
 
 #### Manual Verification:
 - [ ] All 5 algorithms appear in frontend dropdown

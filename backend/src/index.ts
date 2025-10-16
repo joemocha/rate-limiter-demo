@@ -27,7 +27,7 @@ app.post("/settings", async (c) => {
     const body = await c.req.json<{ algorithm: AlgorithmType; rps: number }>();
 
     // Validation
-    if (!["token-bucket", "leaky-bucket"].includes(body.algorithm)) {
+    if (!["token-bucket", "leaky-bucket", "fixed-window", "sliding-window", "sliding-log"].includes(body.algorithm)) {
       return c.json({ error: "Invalid algorithm or RPS value" }, 400);
     }
     if (typeof body.rps !== "number" || body.rps <= 0) {
