@@ -5,7 +5,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:9000';
 
 // Types
 interface SettingsRequest {
-  algorithm: 'token-bucket' | 'leaky-bucket';
+  algorithm: 'token-bucket' | 'leaky-bucket' | 'fixed-window' | 'sliding-window' | 'sliding-log';
   rps: number;
 }
 
@@ -177,7 +177,7 @@ async function handleApplySettings(): Promise<void> {
   const algorithmSelect = document.getElementById('algorithm') as HTMLSelectElement;
   const rpsInput = document.getElementById('rps') as HTMLInputElement;
 
-  const algorithm = algorithmSelect.value as 'token-bucket' | 'leaky-bucket';
+  const algorithm = algorithmSelect.value as 'token-bucket' | 'leaky-bucket' | 'fixed-window' | 'sliding-window' | 'sliding-log';
   const rps = parseInt(rpsInput.value, 10);
 
   if (rps < 1 || rps > 1000) {
@@ -273,7 +273,7 @@ function initializeUI(): void {
     <div class="container">
       <header>
         <h1>Rate Limiting Demo</h1>
-        <p class="subtitle">Compare Token Bucket vs. Leaky Bucket algorithms</p>
+        <p class="subtitle">Compare 5 Rate Limiting Algorithms</p>
       </header>
 
       <div class="panels">
@@ -286,6 +286,9 @@ function initializeUI(): void {
             <select id="algorithm">
               <option value="token-bucket" selected>Token Bucket</option>
               <option value="leaky-bucket">Leaky Bucket</option>
+              <option value="fixed-window">Fixed Window</option>
+              <option value="sliding-window">Sliding Window</option>
+              <option value="sliding-log">Sliding Log</option>
             </select>
           </div>
 
