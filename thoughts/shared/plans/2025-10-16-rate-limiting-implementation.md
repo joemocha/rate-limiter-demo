@@ -435,10 +435,10 @@ export default {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Backend compiles: `cd backend && bun run src/index.ts --dry-run`
-- [ ] Server starts: `cd backend && bun run dev`
-- [ ] Health check responds: `curl http://localhost:9000/health`
-- [ ] Proactive agent: Use **qa-engineer** agent to test all endpoints
+- [x] Backend compiles: `cd backend && bun run src/index.ts --dry-run`
+- [x] Server starts: `cd backend && bun run dev`
+- [x] Health check responds: `curl http://localhost:9000/health`
+- [x] Proactive agent: Use **qa-engineer** agent to test all endpoints
 
 #### Manual Verification:
 - [ ] POST /settings accepts valid algorithm/RPS combinations
@@ -859,9 +859,9 @@ button:disabled {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Frontend builds: `cd frontend && bun run build`
-- [ ] TypeScript compiles: `cd frontend && bun run build`
-- [ ] Proactive agent: Use **ux-designer** agent to review UI implementation
+- [x] Frontend builds: `cd frontend && bun run build`
+- [x] TypeScript compiles: `cd frontend && bun run build`
+- [x] Proactive agent: Use **ux-designer** agent to review UI implementation
 
 #### Manual Verification:
 - [ ] Configuration panel updates backend settings
@@ -967,20 +967,20 @@ describe("End-to-End Integration", () => {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Both servers start: `bun run dev:all`
-- [ ] Algorithm tests pass: `bun test backend/test-algorithms.ts`
-- [ ] Integration tests pass: `bun test test-integration.ts`
-- [ ] Proactive agent: Use **qa-engineer** agent to run comprehensive test suite
-- [ ] Proactive agent: Use **debugger** agent to troubleshoot any failures
-- [ ] Proactive agent: Use **code-reviewer** agent to review implementation
+- [x] Both servers start: `bun run dev:all`
+- [x] Algorithm tests pass: `bun test backend/test-algorithms.test.ts`
+- [x] Integration tests pass: `bun test test-integration.test.ts`
+- [x] Proactive agent: Use **qa-engineer** agent to run comprehensive test suite
+- [x] Proactive agent: Use **debugger** agent to troubleshoot any failures
+- [x] Proactive agent: Use **code-reviewer** agent to review implementation
 
 #### Manual Verification:
-- [ ] Frontend connects to backend successfully
-- [ ] Algorithm switching works correctly
-- [ ] Burst patterns show expected behavior per specification
-- [ ] Token Bucket allows 20/25 burst at 10 RPS
-- [ ] Leaky Bucket allows 15/25 burst at 10 RPS
-- [ ] Recovery behavior matches specification
+- [x] Frontend connects to backend successfully
+- [x] Algorithm switching works correctly
+- [x] Burst patterns show expected behavior per specification
+- [x] Token Bucket allows 20/25 burst at 10 RPS
+- [x] Leaky Bucket allows 15/25 burst at 10 RPS
+- [x] Recovery behavior matches specification
 
 **Implementation Note**: Use the **whimsy-injector** agent after completion to add delightful UI touches.
 
