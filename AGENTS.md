@@ -13,14 +13,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ```bash
-# Install dependencies
+# Terminal 1 — Backend
+cd backend
 bun install
+bun run dev          # Hono server on port 9000
 
-# Run backend server
-bun run server
-
-# Run frontend dev server
-bun run dev
+# Terminal 2 — Frontend
+cd frontend
+python -m http.server 5173
+# Access: http://localhost:5173
 ```
 
 ## Architecture
