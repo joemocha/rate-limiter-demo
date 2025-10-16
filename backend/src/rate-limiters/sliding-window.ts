@@ -49,15 +49,20 @@ export class SlidingWindow implements RateLimiter {
 
   private calculateWeightedCount(): number {
     const now = Date.now();
-    const timeInCurrentSegment = now % this.segmentDuration;
+    const currentSegmentStart = Math.floor(now / this.segmentDuration) * this.segmentDuration;
+    const timeInCurrentSegment = now - currentSegmentStart;
+
+    // Weight represents how far we are into the current segment
+    // Example: if 30ms elapsed in 100ms segment, weight = 0.3
     const currentSegmentWeight = timeInCurrentSegment / this.segmentDuration;
 
     // Get previous segment index (circular)
     const prevSegmentIndex = (this.currentSegmentIndex - 1 + SLIDING_WINDOW_SEGMENTS) % SLIDING_WINDOW_SEGMENTS;
 
-    // Calculate weighted average
-    // Current segment contributes based on how far we are into it
-    // Previous segment contributes the remaining weight
+    // Sliding window counter algorithm:
+    // - Previous complete segment weighted by how much overlaps with sliding window
+    // - Current partial segment counted fully (represents "now")
+    // - Other segments fully counted if within window
     const weightedCount =
       this.segments[prevSegmentIndex] * (1 - currentSegmentWeight) +
       this.segments[this.currentSegmentIndex] +

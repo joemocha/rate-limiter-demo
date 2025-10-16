@@ -24,7 +24,10 @@ export class TokenBucket implements RateLimiter {
     if (intervals > 0) {
       const tokensToAdd = intervals * this.tokensPerInterval;
       this.tokens = Math.min(this.capacity, this.tokens + tokensToAdd);
-      this.lastRefill = now;
+
+      // Align to interval boundaries to prevent timing drift
+      // Example: if 250ms elapsed with 100ms intervals, advance by 200ms not 250ms
+      this.lastRefill = this.lastRefill + (intervals * TOKEN_BUCKET_REFILL_INTERVAL_MS);
     }
   }
 
