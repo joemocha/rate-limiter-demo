@@ -11,10 +11,10 @@ This repository hosts the demo application used to illustrate the contrasting pr
 
 ## Technology Stack
 
-- **Runtime**: Bun (JavaScript runtime and bundler)
+- **Runtime**: Bun (TypeScript/JavaScript runtime and bundler)
 - **Backend Framework**: Hono (lightweight web framework)
 - **Backend Port**: 9000
-- **Frontend**: Vanilla JavaScript (HTML/CSS/JS)
+- **Frontend**: TypeScript + Vite (HTML/CSS/TS)
 - **State Management**: In-memory global counter
 - **Rate Limiting Scope**: Global (shared across all clients)
 
@@ -24,21 +24,21 @@ This repository hosts the demo application used to illustrate the contrasting pr
 /
 ├── backend/
 │   ├── src/
-│   │   ├── index.js                 # Hono server entry point
-│   │   ├── constants.js             # Algorithm tuning parameters
+│   │   ├── index.ts                 # Hono server entry point
+│   │   ├── constants.ts             # Algorithm tuning parameters
 │   │   ├── rate-limiters/
-│   │   │   ├── token-bucket.js      # Token bucket implementation
-│   │   │   ├── leaky-bucket.js      # Leaky bucket implementation
-│   │   │   ├── fixed-window.js      # Fixed window counter (optional)
-│   │   │   ├── sliding-window.js    # Sliding window counter (optional)
-│   │   │   └── sliding-log.js       # Sliding log implementation (optional)
-│   │   └── limiter-factory.js       # Factory for algorithm instantiation
+│   │   │   ├── token-bucket.ts      # Token bucket implementation
+│   │   │   ├── leaky-bucket.ts      # Leaky bucket implementation
+│   │   │   ├── fixed-window.ts      # Fixed window counter (optional)
+│   │   │   ├── sliding-window.ts    # Sliding window counter (optional)
+│   │   │   └── sliding-log.ts       # Sliding log implementation (optional)
+│   │   └── limiter-factory.ts       # Factory for algorithm instantiation
 │   ├── package.json
 │   └── .gitignore
 │
 ├── frontend/
 │   ├── index.html                   # Single-page application
-│   ├── app.js                       # Client-side logic
+│   ├── app.ts                       # Client-side logic
 │   └── styles.css                   # UI styling
 │
 └── README.md
@@ -109,12 +109,12 @@ Receive client requests to evaluate how the current configuration reacts under l
 
 All algorithms implement a common interface with the following contract:
 
-```javascript
+```ts
 class RateLimiter {
-  constructor(rps) {}           // Initialize with requests per second
-  allow()                       // Returns boolean (true = allow, false = reject)
-  reset()                       // Clear internal state
-  getStats()                    // Returns { remaining, resetAt }
+  constructor(rps: number) {}            // Initialize with requests per second
+  allow(): boolean                        // Returns boolean (true = allow, false = reject)
+  reset(): void                           // Clear internal state
+  getStats(): { remaining: number; resetAt: number } // Returns { remaining, resetAt }
 }
 ```
 
@@ -180,37 +180,37 @@ class RateLimiter {
 
 ## Algorithm Configuration Constants
 
-Tunable parameters exposing algorithmic trade-offs (defined in `constants.js`):
+Tunable parameters exposing algorithmic trade-offs (defined in `constants.ts`):
 
 ### Token Bucket
-```javascript
+```ts
 TOKEN_BUCKET_BURST_MULTIPLIER = 2.0      // Burst capacity = rps × multiplier
 TOKEN_BUCKET_REFILL_INTERVAL_MS = 100    // Token addition frequency (granularity)
 ```
 **Trade-off:** Higher multiplier = more burst tolerance, lower = stricter rate adherence.
 
 ### Leaky Bucket
-```javascript
+```ts
 LEAKY_BUCKET_QUEUE_MULTIPLIER = 1.5      // Queue depth = rps × multiplier
 LEAKY_BUCKET_DRAIN_INTERVAL_MS = 50      // Request processing tick rate
 ```
 **Trade-off:** Larger queue = more buffering, higher memory; faster drain = smoother output.
 
 ### Fixed Window (Optional)
-```javascript
+```ts
 FIXED_WINDOW_SIZE_MS = 1000              // Window duration (reset period)
 ```
 **Trade-off:** Smaller window = more frequent resets, higher boundary burst risk.
 
 ### Sliding Window (Optional)
-```javascript
+```ts
 SLIDING_WINDOW_SIZE_MS = 1000            // Total window duration
 SLIDING_WINDOW_SEGMENTS = 10             // Sub-window count (100ms each)
 ```
 **Trade-off:** More segments = smoother rate enforcement, higher memory/CPU cost.
 
 ### Sliding Log (Optional)
-```javascript
+```ts
 SLIDING_LOG_WINDOW_MS = 1000             // Tracking window duration
 SLIDING_LOG_MAX_ENTRIES = 10000          // Maximum log size (prevents memory leak)
 ```
@@ -287,7 +287,9 @@ SLIDING_LOG_MAX_ENTRIES = 10000          // Maximum log size (prevents memory le
 cd backend
 bun install
 
-# Frontend has no dependencies (vanilla JS)
+# Install frontend dependencies (TypeScript + Vite)
+cd ../frontend
+bun install
 ```
 
 ### Running the Application
@@ -299,10 +301,10 @@ bun run dev          # Starts Hono server on port 9000 with hot reload
 ```
 
 **Frontend:**
-Serve the `frontend/` directory using any static file server:
+Start the Vite dev server:
 ```bash
 cd frontend
-bun --bun serve .    # Or use: python -m http.server 5173
+bun run dev
 ```
 
 Access the application at `http://localhost:5173` (or your chosen frontend port).
