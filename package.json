@@ -4,8 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "cd frontend && bun run dev",
-    "server": "bun run backend/index.ts",
-    "build": "cd frontend && bun run build"
+    "server": "cd backend && bun run dev",
+    "build": "cd frontend && bun run build",
+    "dev:all": "bun run server & bun run dev",
+    "test": "bun run backend/test-algorithms.test.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
