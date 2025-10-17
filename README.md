@@ -290,8 +290,8 @@ TOKEN_BUCKET_REFILL_INTERVAL_MS = 100    // Token addition frequency (granularit
 
 ### Leaky Bucket
 ```ts
-LEAKY_BUCKET_QUEUE_MULTIPLIER = 1.5      // Queue depth = rps × multiplier
-LEAKY_BUCKET_DRAIN_INTERVAL_MS = 50      // Request processing tick rate
+LEAKY_BUCKET_QUEUE_MULTIPLIER = 2.0      // Queue depth = rps × multiplier
+LEAKY_BUCKET_DRAIN_INTERVAL_MS = 100      // Request processing tick rate
 ```
 **Trade-off:** Larger queue = more buffering, higher memory; faster drain = smoother output.
 
