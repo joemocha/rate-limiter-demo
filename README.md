@@ -13,10 +13,10 @@ This document specifies the requirements for a demo application that illustrates
 
 ## Technology Stack
 
-- **Runtime**: Bun (TypeScript/JavaScript runtime and bundler)
-- **Backend Framework**: Hono (lightweight web framework)
+- **Runtime**: Bun (TypeScript/JavaScript runtime, bundler, and HTTP server)
+- **Backend**: Native `Bun.serve` with WebSocket support
 - **Backend Port**: 9000
-- **Frontend**: TypeScript + Vite (HTML/CSS/TS)
+- **Frontend**: TypeScript (bundled with `bun build`)
 - **State Management**: In-memory global counter
 - **Rate Limiting Scope**: Global (shared across all clients)
 
@@ -26,12 +26,9 @@ This document specifies the requirements for a demo application that illustrates
 /
 ├── backend/
 │   ├── src/
-│   │   ├── index.ts                 # Hono server entry point
+│   │   ├── index.ts                 # Bun.serve entry point
 │   │   ├── constants.ts             # Algorithm tuning parameters
-│   │   ├── database.ts              # SQLite persistence layer
 │   │   ├── websocket.ts             # WebSocket handler for racing
-│   │   ├── workers/                 # Worker scripts for parallel processing
-│   │   │   └── algorithm-worker.ts  # Dedicated algorithm worker
 │   │   ├── rate-limiters/
 │   │   │   ├── token-bucket.ts      # Token bucket implementation
 │   │   │   ├── leaky-bucket.ts      # Leaky bucket implementation
@@ -39,8 +36,6 @@ This document specifies the requirements for a demo application that illustrates
 │   │   │   ├── sliding-window.ts    # Sliding window counter (optional)
 │   │   │   └── sliding-log.ts       # Sliding log implementation (optional)
 │   │   └── limiter-factory.ts       # Factory for algorithm instantiation
-│   ├── migrations/                  # Database migration scripts
-│   │   └── 001_initial.sql          # Initial schema setup
 │   ├── package.json
 │   └── .gitignore
 │
@@ -56,9 +51,8 @@ This document specifies the requirements for a demo application that illustrates
 │   │   │   └── arena/               # Algorithm Arena (/arena)
 │   │   │       ├── index.ts
 │   │   │       ├── workers/         # Web Workers for computation
-│   │   │       │   ├── simulation-worker.ts
-│   │   │       │   └── metrics-worker.ts
-│   │   │       ├── visualizations/  # D3/Canvas components
+│   │   │       │   └── algorithm-worker.ts
+│   │   │       ├── visualizations/  # Canvas components
 │   │   │       │   ├── race-track.ts
 │   │   │       │   └── particles.ts
 │   │   │       └── style.css
@@ -69,7 +63,6 @@ This document specifies the requirements for a demo application that illustrates
 │   │   ├── main.ts                  # App entry point
 │   │   └── style.css                # Global styles
 │   ├── index.html                   # Single entry point
-│   ├── service-worker.ts            # Offline support & caching
 │   └── package.json
 │
 └── README.md
@@ -322,11 +315,12 @@ SLIDING_LOG_MAX_ENTRIES = 10000          // Maximum log size (prevents memory le
 ### Backend Configuration
 The backend SHALL support the following environment variables:
 - `BACKEND_PORT`: Port for API server (default: 9000)
-- `CORS_ORIGIN`: Allowed frontend origin (default: http://localhost:5173)
 
 ### Frontend Configuration
-The frontend SHALL support the following environment variables:
-- `VITE_API_URL`: Backend API base URL (default: http://localhost:9000)
+The frontend dev server SHALL support the following environment variable:
+- `API_PROXY_TARGET`: Backend API base URL for proxying (default: http://localhost:9000)
+
+**Note**: In production, the backend serves the frontend, so no frontend environment variables are needed.
 
 ## Landing Page & Navigation
 
@@ -555,15 +549,15 @@ A high-performance visual racing environment where Token Bucket (Fox) and Leaky 
 
 ### Technical Architecture
 
-#### Three-Layer Performance Architecture
+#### Simplified Two-Layer Architecture
 
 **1. Web Workers (Computation Layer)**
-- Dedicated workers for each algorithm enable true parallel processing
-- Zero main thread blocking for smooth 60fps animations
-- SharedArrayBuffer for efficient memory sharing between workers
+- Two dedicated workers (one per algorithm) for parallel processing
+- Main thread stays free for smooth 60fps animations
+- Simple `postMessage` API for communication
 
 ```typescript
-// dedicated-worker.ts per algorithm
+// algorithm-worker.ts (instantiated twice)
 class AlgorithmWorker {
   private limiter: RateLimiter;
 
@@ -577,230 +571,67 @@ class AlgorithmWorker {
         remaining: this.limiter.getStats().remaining
       }));
 
-      // Transfer ownership for zero-copy performance
-      postMessage({ type: 'RESULTS', results }, [results.buffer]);
+      postMessage({ type: 'RESULTS', results });
     }
   };
 }
 ```
 
-**2. Service Worker (Network & Cache Layer)**
-- Manages WebSocket connections with automatic reconnection
-- Caches race replays for offline viewing
-- Implements progressive web app capabilities
-
-```typescript
-// service-worker.ts - Offline-first racing
-self.addEventListener('fetch', event => {
-  if (event.request.url.includes('/ws/race')) {
-    event.respondWith(handleWebSocket(event.request));
-  } else if (event.request.url.includes('/replay/')) {
-    event.respondWith(cacheFirst(event.request));
-  }
-});
-
-// Cache strategy for replays
-const CACHE_NAME = 'race-replays-v1';
-const MAX_CACHED_RACES = 50;
-```
-
-**3. Main Thread (Rendering Only)**
-- Canvas/WebGL visualization at consistent 60fps
-- Particle physics for request flow visualization
-- Zero algorithm computation on main thread
-
-#### SQLite Persistence Layer
-
-**Database Schema:**
-
-```sql
--- Race sessions and results
-CREATE TABLE race_sessions (
-  id TEXT PRIMARY KEY DEFAULT (hex(randomblob(16))),
-  created_at INTEGER DEFAULT (unixepoch()),
-  config JSON NOT NULL,  -- Algorithm configs and RPS settings
-  winner TEXT,
-  duration_ms INTEGER,
-  replay_data BLOB,  -- MessagePack compressed frames
-  INDEX idx_created (created_at DESC)
-);
-
--- Shareable traffic patterns
-CREATE TABLE traffic_patterns (
-  id TEXT PRIMARY KEY DEFAULT (hex(randomblob(16))),
-  name TEXT NOT NULL,
-  description TEXT,
-  pattern JSON NOT NULL,  -- Array of traffic events
-  creator TEXT,
-  difficulty TEXT CHECK(difficulty IN ('easy','medium','hard','chaos')),
-  times_used INTEGER DEFAULT 0,
-  INDEX idx_popular (times_used DESC)
-);
-
--- Leaderboard entries
-CREATE TABLE leaderboard (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  session_id TEXT REFERENCES race_sessions(id),
-  player_name TEXT,
-  algorithm TEXT,
-  score INTEGER,
-  metrics JSON,  -- Detailed performance metrics
-  created_at INTEGER DEFAULT (unixepoch()),
-  INDEX idx_score (score DESC)
-);
-
--- Performance analytics
-CREATE TABLE performance_metrics (
-  timestamp INTEGER DEFAULT (unixepoch()),
-  session_id TEXT REFERENCES race_sessions(id),
-  algorithm TEXT NOT NULL,
-  request_count INTEGER,
-  accepted INTEGER,
-  rejected INTEGER,
-  avg_latency_ms REAL,
-  p99_latency_ms REAL,
-  memory_bytes INTEGER,
-  PRIMARY KEY (session_id, algorithm, timestamp)
-);
-```
-
-**Bun SQLite Integration:**
-
-```typescript
-import { Database } from "bun:sqlite";
-
-class RaceDatabase {
-  private db: Database;
-
-  constructor() {
-    this.db = new Database("races.db", { create: true });
-    this.db.exec("PRAGMA journal_mode = WAL");  // Better concurrency
-    this.db.exec("PRAGMA synchronous = NORMAL"); // Balance safety/speed
-    this.initSchema();
-  }
-
-  // Prepared statements for performance
-  private statements = {
-    saveRace: this.db.prepare(`
-      INSERT INTO race_sessions (config, duration_ms, winner, replay_data)
-      VALUES ($config, $duration, $winner, $replay)
-    `),
-
-    getLeaderboard: this.db.prepare(`
-      SELECT player_name, algorithm, score, metrics
-      FROM leaderboard
-      WHERE pattern_id = $pattern
-      ORDER BY score DESC
-      LIMIT 10
-    `),
-
-    recordMetrics: this.db.prepare(`
-      INSERT INTO performance_metrics
-      VALUES ($timestamp, $session, $algorithm, $requests,
-              $accepted, $rejected, $avgLatency, $p99, $memory)
-    `)
-  };
-
-  saveRaceSession(session: RaceSession): string {
-    const compressed = Bun.deflateSync(
-      msgpack.encode(session.frames)
-    );
-
-    const result = this.statements.saveRace.run({
-      $config: JSON.stringify(session.config),
-      $duration: session.duration,
-      $winner: session.winner,
-      $replay: compressed
-    });
-
-    return result.lastInsertRowid;
-  }
-}
-```
+**2. Main Thread (Rendering + Coordination)**
+- Native Canvas API for visualization at 60fps
+- CSS animations for smooth transitions
+- WebSocket connection to backend for real-time state
+- Coordinates workers and renders comparative metrics
 
 ### Racing-Specific API Endpoints
 
 #### WebSocket Endpoint for Real-Time Racing
 
 ```typescript
-// GET /ws/race - WebSocket connection for live updates
-// Protocol: Binary MessagePack for efficiency
+// /ws/race - WebSocket connection for live updates
+// Protocol: JSON (simple and readable)
 interface RaceFrame {
   timestamp: number;
   foxState: {
     tokens: number;
     accepted: number;
     rejected: number;
-    queueDepth: number;
   };
   hedgehogState: {
     queueSize: number;
     accepted: number;
     rejected: number;
-    drainRate: number;
   };
   event?: 'burst' | 'spike' | 'recovery';
 }
 
-// Message flow: 60 updates per second
-ws.send(msgpack.encode(frame));
+// Message flow: 30 updates per second
+ws.send(JSON.stringify(frame));
 ```
 
 #### RESTful Endpoints
 
 ```typescript
-// Start a new race session
+// Start a new race session (establishes WebSocket connection)
 POST /api/race/start
 Request: {
   rps: number;
-  duration: number;
-  pattern: 'burst' | 'sustained' | 'chaos' | 'custom';
-  customPattern?: TrafficEvent[];
+  duration: number;  // seconds
+  pattern: 'burst' | 'sustained' | 'chaos';
 }
-Response: { sessionId: string, wsUrl: string }
+Response: {
+  sessionId: string,
+  wsUrl: string
+}
 
-// Save race for replay
-POST /api/race/save
+// Stop an active race
+POST /api/race/stop
 Request: { sessionId: string }
-Response: { replayId: string, shareUrl: string }
-
-// Get race replay data
-GET /api/race/:replayId
 Response: {
-  config: RaceConfig,
-  frames: RaceFrame[],
-  winner: string,
-  metrics: PerformanceMetrics
-}
-
-// Traffic pattern library
-GET /api/patterns?difficulty=medium&sort=popular
-POST /api/patterns/create
-Request: {
-  name: string,
-  description: string,
-  events: Array<{time: number, count: number}>
-}
-
-// Leaderboard
-GET /api/leaderboard?pattern=:patternId&limit=10
-POST /api/leaderboard/submit
-Request: { sessionId: string, playerName: string }
-
-// Analytics
-GET /api/stats/algorithms?timeframe=7d
-Response: {
-  tokenBucket: {
-    totalRaces: 1234,
-    winRate: 0.54,
-    avgAcceptanceRate: 0.89,
-    avgLatency: 12.3
-  },
-  leakyBucket: {
-    totalRaces: 1234,
-    winRate: 0.46,
-    avgAcceptanceRate: 0.87,
-    avgLatency: 15.7
+  winner: 'fox' | 'hedgehog' | 'tie',
+  metrics: {
+    fox: { accepted: number, rejected: number },
+    hedgehog: { accepted: number, rejected: number }
   }
 }
 ```
@@ -840,39 +671,41 @@ Response: {
 ```
 
 **Visual Elements:**
-- **Token Visualization**: Animated water level for token bucket
-- **Queue Visualization**: Stack representation for leaky bucket
+- **Token Visualization**: Animated water level for token bucket (Canvas API)
+- **Queue Visualization**: Stack representation for leaky bucket (Canvas API)
 - **Request Particles**: Flowing particles show accept/reject in real-time
-- **Metrics Graphs**: D3.js powered comparative charts
-- **Timeline Scrubber**: Replay any moment of the race
+- **Metrics Graphs**: Native Canvas/SVG charts with CSS animations
+- **Real-time Stats**: Live acceptance/rejection counts and rates
 
 ### Performance Optimizations
 
-#### Worker Pool Management
+#### Simple Worker Management
 
 ```typescript
-class WorkerPool {
-  private workers = new Map<string, Worker>();
-  private sharedBuffers = new Map<string, SharedArrayBuffer>();
+class RaceWorkerManager {
+  private foxWorker: Worker;
+  private hedgehogWorker: Worker;
 
   constructor() {
-    const cores = navigator.hardwareConcurrency || 4;
-    this.initializeWorkers(Math.min(cores, 4));
+    this.foxWorker = new Worker('./algorithm-worker.js');
+    this.hedgehogWorker = new Worker('./algorithm-worker.js');
+
+    // Initialize each with their respective algorithms
+    this.foxWorker.postMessage({ type: 'INIT', algorithm: 'token-bucket' });
+    this.hedgehogWorker.postMessage({ type: 'INIT', algorithm: 'leaky-bucket' });
   }
 
-  async processInParallel(
-    algorithm: string,
-    requests: Request[]
-  ): Promise<Results> {
-    const worker = this.getOrCreateWorker(algorithm);
+  async processInParallel(requests: Request[]): Promise<Results> {
+    const foxPromise = this.sendToWorker(this.foxWorker, requests);
+    const hedgehogPromise = this.sendToWorker(this.hedgehogWorker, requests);
 
+    return Promise.all([foxPromise, hedgehogPromise]);
+  }
+
+  private sendToWorker(worker: Worker, requests: Request[]): Promise<Result> {
     return new Promise((resolve) => {
       worker.onmessage = (e) => resolve(e.data);
-      worker.postMessage({
-        type: 'PROCESS_BATCH',
-        requests,
-        buffer: this.sharedBuffers.get(algorithm)
-      });
+      worker.postMessage({ type: 'PROCESS_BATCH', requests });
     });
   }
 }
@@ -883,24 +716,28 @@ class WorkerPool {
 ```typescript
 class RaceRenderer {
   private lastFrame = 0;
-  private frameSkip = false;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
 
   render(timestamp: number) {
     const delta = timestamp - this.lastFrame;
 
     // Target 60fps (16.67ms per frame)
-    if (delta >= 16) {
-      if (!this.frameSkip || delta >= 33) {
-        this.updateParticles(delta);
-        this.renderVisualization();
-        this.lastFrame = timestamp;
-        this.frameSkip = false;
-      } else {
-        this.frameSkip = true; // Skip alternate frames if behind
-      }
+    if (delta >= 16.67) {
+      this.clearCanvas();
+      this.renderTokenBucket();
+      this.renderLeakyBucket();
+      this.renderParticles(delta);
+      this.updateMetrics();
+
+      this.lastFrame = timestamp;
     }
 
     requestAnimationFrame((t) => this.render(t));
+  }
+
+  private clearCanvas() {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 }
 ```
@@ -942,62 +779,36 @@ class ParticlePool {
 // Racing mode specific constants
 const RACE_CONFIG = {
   // Performance
-  UPDATE_INTERVAL_MS: 16,          // 60fps target
-  WORKER_POOL_SIZE: 4,              // Max parallel workers
-  SHARED_BUFFER_SIZE: 1048576,     // 1MB shared memory
+  UPDATE_INTERVAL_MS: 33,          // 30fps target (reduced for simplicity)
+  PARTICLE_POOL_SIZE: 500,         // Reusable particles
 
   // Limits
   MAX_RACE_DURATION_MS: 60000,     // 1 minute max
-  MAX_REQUESTS_PER_SECOND: 1000,   // Prevent DOS
-  PARTICLE_POOL_SIZE: 1000,        // Reusable particles
-
-  // Persistence
-  REPLAY_COMPRESSION: 'brotli',    // 10:1 typical ratio
-  MAX_REPLAY_SIZE_MB: 10,          // Storage limit
-  REPLAY_RETENTION_DAYS: 30,       // Auto-cleanup
+  MAX_REQUESTS_PER_SECOND: 1000,   // Prevent abuse
 
   // WebSocket
   WS_RECONNECT_DELAY_MS: 1000,     // Initial reconnect delay
-  WS_MAX_RECONNECT_DELAY_MS: 30000,// Max backoff
   WS_PING_INTERVAL_MS: 30000,      // Keep-alive
-
-  // Cache
-  LEADERBOARD_CACHE_TTL_S: 60,     // 1 minute
-  PATTERN_CACHE_TTL_S: 3600,       // 1 hour
-  RACE_CACHE_SIZE: 100              // LRU cache entries
 };
 ```
 
-### Progressive Enhancement
+### Browser Compatibility
 
 ```typescript
-// Graceful degradation for older browsers
+// Simple feature detection
 class RaceInitializer {
   async initialize() {
     const features = {
       workers: typeof Worker !== 'undefined',
-      sharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
-      webgl: this.checkWebGLSupport(),
-      serviceWorker: 'serviceWorker' in navigator
+      canvas: !!document.createElement('canvas').getContext('2d'),
+      websocket: 'WebSocket' in window
     };
 
-    if (features.workers && features.sharedArrayBuffer) {
-      // Full performance mode
-      return new WorkerBasedRaceEngine();
-    } else if (features.workers) {
-      // Degraded mode without shared memory
-      return new BasicWorkerRaceEngine();
-    } else {
-      // Fallback to main thread with reduced features
-      console.warn('Running in compatibility mode');
-      return new MainThreadRaceEngine();
+    if (!features.workers || !features.canvas || !features.websocket) {
+      throw new Error('Browser not supported. Please use a modern browser.');
     }
-  }
 
-  private checkWebGLSupport(): boolean {
-    const canvas = document.createElement('canvas');
-    return !!(canvas.getContext('webgl') ||
-             canvas.getContext('experimental-webgl'));
+    return new RaceEngine();
   }
 }
 ```
@@ -1016,19 +827,6 @@ bun install:all
 # Or install individually:
 cd backend && bun install
 cd ../frontend && bun install
-```
-
-### Database Setup
-
-```bash
-# Initialize the SQLite database
-bun run db:init
-
-# Run migrations
-bun run db:migrate
-
-# Seed with sample data (optional)
-bun run db:seed
 ```
 
 ### Running the Application
@@ -1063,15 +861,20 @@ bun run preview:all   # Preview production builds
 
 Access the application at `http://localhost:5173`. The landing page (`/`) allows you to choose your experience, or navigate directly to `/explorer` or `/arena`.
 
-### CORS
+### Development vs Production Architecture
 
-During local development, the frontend runs at `http://localhost:5173`. Configure the backend to allow this origin.
+**Development Mode:**
+- Frontend dev server: `http://localhost:5173` (with hot reload)
+- Backend API server: `http://localhost:9000`
+- **Architecture**: Frontend dev server proxies all API requests (`/test`, `/settings`, `/health`, `/reset`, `/api/*`) to backend
+- **No CORS needed**: Browser only communicates with localhost:5173, which forwards requests to backend
 
-- Allowed origin: `http://localhost:5173` (update if your frontend port differs)
-- Allowed methods: `GET, POST, OPTIONS`
-- Allowed headers: `Content-Type`
-- Exposed headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`
-- Cache: set `Cache-Control: no-store` on `GET /test`
+**Production Mode:**
+- Single server: `http://localhost:9000`
+- **Architecture**: Backend serves both API endpoints and pre-built frontend static files
+- **No CORS needed**: Everything is same-origin
+
+This hybrid approach provides the best developer experience (hot reload) while maintaining a production-ready single-server deployment model.
 
 ### Testing Algorithm Behavior
 
@@ -1259,58 +1062,43 @@ This is a demonstration application designed to visually illustrate rate limitin
 The frontend intentionally does not handle network failures to maintain focus on rate limiting behavior.
 
 ### Build Process
-- Frontend: Bundle with Vite for production
-- Backend: Compile TypeScript to JavaScript
+- Frontend: Bundle with `bun build` for production
+- Backend: Run directly with Bun (transpiles TypeScript natively)
 - Output directories: `frontend/dist`, `backend/dist`
 
 ## Dependencies
 
-### Core Runtime & Framework
-- `bun` - All-in-one JavaScript runtime and toolkit
+### Core Runtime & Tooling
+- `bun` - All-in-one JavaScript runtime (HTTP server, WebSocket, bundler, SQLite, compression)
 - `typescript` - Type-safe development
-- `hono` - Lightweight web framework for backend
-- `vite` - Fast frontend bundling and HMR
-
-### Frontend Dependencies
-
-#### Core SPA Infrastructure
-- Vanilla TypeScript History API for client-side routing (no library needed)
-- Standard browser APIs for navigation and state management
-
-#### Explorer Route (`/explorer`)
-- `@types/node` - Node.js type definitions
-- Standard browser APIs for basic UI
-
-#### Arena Route (`/arena`)
-
-#### Visualization & Animation
-- `d3` - Data-driven visualizations for metrics charts
-- `framer-motion` - Smooth UI animations and transitions
-- `three` - WebGL-based 3D visualizations (optional)
-
-#### Performance & Workers
-- `@hono/websocket` - WebSocket support for real-time updates
-- `comlink` - Seamless Web Worker communication
-- `msgpack` - Binary serialization for efficient data transfer
-
-#### Persistence & Data
-- `bun:sqlite` - Native SQLite support (built into Bun)
-- `brotli` - High-ratio compression for replay data
-
-#### PWA & Offline Support
-- `workbox` - Service Worker toolkit for offline functionality
-- `idb` - Promise-based IndexedDB wrapper
-
-### Development Dependencies
 - `@types/bun` - Bun runtime type definitions
-- `concurrently` - Run multiple dev servers simultaneously
+
+### Development Workflow
+- `concurrently` - Process lifecycle management (cleanup on kill)
 - `eslint` - Code quality and consistency
 - `prettier` - Code formatting
 
-### Optional Enhancements
-- `chart.js` - Alternative charting library
-- `rxjs` - Reactive programming for complex event streams
-- `zod` - Runtime type validation for API contracts
+### Native APIs Used (Zero Dependencies)
+
+#### Backend
+- `Bun.serve` - HTTP server with native routing and WebSocket support
+- `bun:sqlite` - Native SQLite database (no external package)
+- `Bun.deflateSync` - Native compression for data storage
+
+#### Frontend Build
+- `bun build` - Native bundler with watch mode and minification
+- No Vite, no Webpack - pure Bun bundling
+
+#### Frontend Runtime
+- **Routing**: Vanilla TypeScript History API (client-side routing)
+- **Workers**: Native Web Workers with `postMessage` API
+- **Visualization**: Native Canvas API and SVG for charts/animations
+- **Animations**: CSS animations and Web Animations API
+- **Serialization**: JSON (simplicity over binary optimization)
+- **State Management**: Standard browser APIs
+
+### Design Philosophy
+This demo prioritizes **native APIs over frameworks** to minimize dependencies and maximize educational clarity. Every dependency removed is one less abstraction between the learner and the underlying concepts.
 
 ## Conformance Requirements
 

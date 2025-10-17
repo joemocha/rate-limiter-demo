@@ -4,12 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "dev": "bun --watch dev-server.ts",
+    "build": "tsc && bun build ./src/main.ts --outdir ./dist --target browser --minify && cp index.html dist/ && sed -i 's|/src/main.ts|/main.js|g; /<title>/a\\    <link rel=\"stylesheet\" href=\"/main.css\" />' dist/index.html",
+    "preview": "bun --serve ./dist"
   },
   "devDependencies": {
-    "typescript": "~5.9.3",
-    "vite": "^7.1.7"
+    "typescript": "~5.9.3"
   }
 }
