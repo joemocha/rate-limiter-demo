@@ -5,8 +5,10 @@ This document specifies the requirements for a demo application that illustrates
 ## Application Overview
 
 - **Architecture**
-  - **Front end**: A single-page client that lets you switch rate-limiting strategies and fire test requests.
-  - **Back end**: A simple API that exposes configuration and testing endpoints to observe behavior under different algorithms and rates.
+  - **Landing Page**: Interactive hub showcasing Fox vs Hedgehog philosophy through choice of exploration paths
+  - **Algorithm Explorer**: Single-algorithm testing environment for deep parameter tuning (existing UI)
+  - **Algorithm Arena**: Head-to-head racing visualization for comparative analysis (new feature)
+  - **Shared Backend**: Unified API supporting both experiences with consistent rate limiting implementations
 - **Purpose**: Demonstrate how broad experimentation (fox) and focused mastery (hedgehog) influence the design and tuning of rate limiting solutions.
 
 ## Technology Stack
@@ -22,10 +24,21 @@ This document specifies the requirements for a demo application that illustrates
 
 ```
 /
+├── landing/                          # Landing page for mode selection
+│   ├── index.html                   # Interactive hub page
+│   ├── src/
+│   │   ├── main.ts                  # Landing page logic
+│   │   └── style.css                # Landing page styling
+│   └── tutorial.html                # First-time user guide
+│
 ├── backend/
 │   ├── src/
 │   │   ├── index.ts                 # Hono server entry point
 │   │   ├── constants.ts             # Algorithm tuning parameters
+│   │   ├── database.ts              # SQLite persistence layer
+│   │   ├── websocket.ts             # WebSocket handler for racing
+│   │   ├── workers/                 # Worker scripts for parallel processing
+│   │   │   └── algorithm-worker.ts  # Dedicated algorithm worker
 │   │   ├── rate-limiters/
 │   │   │   ├── token-bucket.ts      # Token bucket implementation
 │   │   │   ├── leaky-bucket.ts      # Leaky bucket implementation
@@ -33,14 +46,29 @@ This document specifies the requirements for a demo application that illustrates
 │   │   │   ├── sliding-window.ts    # Sliding window counter (optional)
 │   │   │   └── sliding-log.ts       # Sliding log implementation (optional)
 │   │   └── limiter-factory.ts       # Factory for algorithm instantiation
+│   ├── migrations/                  # Database migration scripts
+│   │   └── 001_initial.sql          # Initial schema setup
 │   ├── package.json
 │   └── .gitignore
 │
-├── frontend/
+├── frontend/                         # Algorithm Explorer (existing UI)
 │   ├── src/
 │   │   ├── main.ts                  # Client-side logic
 │   │   └── style.css                # UI styling
 │   └── index.html                   # Single-page application
+│
+├── arena/                            # Algorithm Arena (racing mode)
+│   ├── src/
+│   │   ├── main.ts                  # Racing visualization logic
+│   │   ├── workers/                 # Web Workers for computation
+│   │   │   ├── simulation-worker.ts # Algorithm simulation
+│   │   │   └── metrics-worker.ts    # Metrics calculation
+│   │   ├── visualizations/          # D3/Canvas components
+│   │   │   ├── race-track.ts        # Main racing visualization
+│   │   │   └── particles.ts         # Request particle system
+│   │   └── style.css                # Arena styling
+│   ├── index.html                   # Racing interface
+│   └── service-worker.ts            # Offline support & caching
 │
 └── README.md
 ```
@@ -299,7 +327,93 @@ The frontend SHALL support the following environment variables:
 - `VITE_API_URL`: Backend API base URL (default: http://localhost:9000)
 - `VITE_PORT`: Frontend dev server port (default: 5173)
 
-## Frontend Specification
+## Landing Page & Navigation
+
+### Route Structure
+- `/` - Landing page with mode selection
+- `/explorer` - Classic single-algorithm tester (existing UI)
+- `/arena` - Algorithm racing visualization
+- `/tutorial` - First-time user interactive tour
+
+### Landing Page Design
+
+The landing page embodies the Fox vs Hedgehog philosophy through interactive choice:
+
+**Visual Layout:**
+```
+┌──────────────────────────────────────┐
+│     Fox vs. Hedgehog Rate Limiting    │
+│         Choose Your Path               │
+├──────────────────────────────────────┤
+│                                        │
+│  🦊 Algorithm Explorer    🏁 Algorithm Arena │
+│  "The Fox knows many      "Race algorithms  │
+│   things..."               head-to-head"    │
+│                                        │
+│  [Single Algorithm]       [Dual Racing]     │
+│  [Detailed Analysis]      [Visual Compare]  │
+│  [Parameter Tuning]       [Live Metrics]    │
+│                                        │
+│  [Enter Explorer →]       [Enter Arena →]   │
+│                                        │
+├──────────────────────────────────────┤
+│ 🎓 New here? [Start Tutorial]         │
+└──────────────────────────────────────┘
+```
+
+### Smart Default System
+
+```typescript
+interface NavigationState {
+  lastVisited: 'explorer' | 'arena' | null;
+  visitCount: number;
+  preferences: {
+    algorithm: string;
+    rps: number;
+    theme: 'light' | 'dark';
+  };
+}
+
+// On page load
+const navState = localStorage.getItem('navState');
+if (!navState || navState.visitCount === 0) {
+  showTutorial();
+} else if (navState.lastVisited) {
+  // Auto-redirect after 2s with cancel option
+  redirectWithDelay(navState.lastVisited);
+}
+```
+
+### Shared Configuration Service
+
+Settings are synchronized between both modes to maintain consistency:
+
+```typescript
+// Synchronized settings between modes
+class SharedConfigService {
+  private config = {
+    rps: 10,
+    primaryAlgorithm: 'token-bucket',
+    secondaryAlgorithm: 'leaky-bucket'
+  };
+
+  // Both UIs subscribe to changes
+  subscribe(listener: ConfigListener) {
+    this.listeners.push(listener);
+  }
+
+  // Settings persist across mode switches
+  updateRPS(value: number) {
+    this.config.rps = value;
+    this.broadcast();
+    localStorage.setItem('sharedConfig', JSON.stringify(this.config));
+  }
+}
+```
+
+## Algorithm Explorer (Classic Mode)
+
+*This is the existing single-algorithm testing interface, preserved as originally specified.*
 
 ### Configuration Panel
 
@@ -358,6 +472,461 @@ The frontend SHALL support the following environment variables:
    - Red segment: % rejected
    - Updates in real-time
 
+## Algorithm Arena (Racing Mode)
+
+### Overview
+
+A high-performance visual racing environment where Token Bucket (Fox) and Leaky Bucket (Hedgehog) compete head-to-head under identical traffic conditions. This mode emphasizes comparative analysis through real-time visualization and parallel execution.
+
+### Technical Architecture
+
+#### Three-Layer Performance Architecture
+
+**1. Web Workers (Computation Layer)**
+- Dedicated workers for each algorithm enable true parallel processing
+- Zero main thread blocking for smooth 60fps animations
+- SharedArrayBuffer for efficient memory sharing between workers
+
+```typescript
+// dedicated-worker.ts per algorithm
+class AlgorithmWorker {
+  private limiter: RateLimiter;
+
+  onmessage = (e: MessageEvent) => {
+    const { type, requests } = e.data;
+
+    if (type === 'PROCESS_BATCH') {
+      const results = requests.map(r => ({
+        allowed: this.limiter.allow(),
+        timestamp: r.timestamp,
+        remaining: this.limiter.getStats().remaining
+      }));
+
+      // Transfer ownership for zero-copy performance
+      postMessage({ type: 'RESULTS', results }, [results.buffer]);
+    }
+  };
+}
+```
+
+**2. Service Worker (Network & Cache Layer)**
+- Manages WebSocket connections with automatic reconnection
+- Caches race replays for offline viewing
+- Implements progressive web app capabilities
+
+```typescript
+// service-worker.ts - Offline-first racing
+self.addEventListener('fetch', event => {
+  if (event.request.url.includes('/ws/race')) {
+    event.respondWith(handleWebSocket(event.request));
+  } else if (event.request.url.includes('/replay/')) {
+    event.respondWith(cacheFirst(event.request));
+  }
+});
+
+// Cache strategy for replays
+const CACHE_NAME = 'race-replays-v1';
+const MAX_CACHED_RACES = 50;
+```
+
+**3. Main Thread (Rendering Only)**
+- Canvas/WebGL visualization at consistent 60fps
+- Particle physics for request flow visualization
+- Zero algorithm computation on main thread
+
+#### SQLite Persistence Layer
+
+**Database Schema:**
+
+```sql
+-- Race sessions and results
+CREATE TABLE race_sessions (
+  id TEXT PRIMARY KEY DEFAULT (hex(randomblob(16))),
+  created_at INTEGER DEFAULT (unixepoch()),
+  config JSON NOT NULL,  -- Algorithm configs and RPS settings
+  winner TEXT,
+  duration_ms INTEGER,
+  replay_data BLOB,  -- MessagePack compressed frames
+  INDEX idx_created (created_at DESC)
+);
+
+-- Shareable traffic patterns
+CREATE TABLE traffic_patterns (
+  id TEXT PRIMARY KEY DEFAULT (hex(randomblob(16))),
+  name TEXT NOT NULL,
+  description TEXT,
+  pattern JSON NOT NULL,  -- Array of traffic events
+  creator TEXT,
+  difficulty TEXT CHECK(difficulty IN ('easy','medium','hard','chaos')),
+  times_used INTEGER DEFAULT 0,
+  INDEX idx_popular (times_used DESC)
+);
+
+-- Leaderboard entries
+CREATE TABLE leaderboard (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT REFERENCES race_sessions(id),
+  player_name TEXT,
+  algorithm TEXT,
+  score INTEGER,
+  metrics JSON,  -- Detailed performance metrics
+  created_at INTEGER DEFAULT (unixepoch()),
+  INDEX idx_score (score DESC)
+);
+
+-- Performance analytics
+CREATE TABLE performance_metrics (
+  timestamp INTEGER DEFAULT (unixepoch()),
+  session_id TEXT REFERENCES race_sessions(id),
+  algorithm TEXT NOT NULL,
+  request_count INTEGER,
+  accepted INTEGER,
+  rejected INTEGER,
+  avg_latency_ms REAL,
+  p99_latency_ms REAL,
+  memory_bytes INTEGER,
+  PRIMARY KEY (session_id, algorithm, timestamp)
+);
+```
+
+**Bun SQLite Integration:**
+
+```typescript
+import { Database } from "bun:sqlite";
+
+class RaceDatabase {
+  private db: Database;
+
+  constructor() {
+    this.db = new Database("races.db", { create: true });
+    this.db.exec("PRAGMA journal_mode = WAL");  // Better concurrency
+    this.db.exec("PRAGMA synchronous = NORMAL"); // Balance safety/speed
+    this.initSchema();
+  }
+
+  // Prepared statements for performance
+  private statements = {
+    saveRace: this.db.prepare(`
+      INSERT INTO race_sessions (config, duration_ms, winner, replay_data)
+      VALUES ($config, $duration, $winner, $replay)
+    `),
+
+    getLeaderboard: this.db.prepare(`
+      SELECT player_name, algorithm, score, metrics
+      FROM leaderboard
+      WHERE pattern_id = $pattern
+      ORDER BY score DESC
+      LIMIT 10
+    `),
+
+    recordMetrics: this.db.prepare(`
+      INSERT INTO performance_metrics
+      VALUES ($timestamp, $session, $algorithm, $requests,
+              $accepted, $rejected, $avgLatency, $p99, $memory)
+    `)
+  };
+
+  saveRaceSession(session: RaceSession): string {
+    const compressed = Bun.deflateSync(
+      msgpack.encode(session.frames)
+    );
+
+    const result = this.statements.saveRace.run({
+      $config: JSON.stringify(session.config),
+      $duration: session.duration,
+      $winner: session.winner,
+      $replay: compressed
+    });
+
+    return result.lastInsertRowid;
+  }
+}
+```
+
+### Racing-Specific API Endpoints
+
+#### WebSocket Endpoint for Real-Time Racing
+
+```typescript
+// GET /ws/race - WebSocket connection for live updates
+// Protocol: Binary MessagePack for efficiency
+interface RaceFrame {
+  timestamp: number;
+  foxState: {
+    tokens: number;
+    accepted: number;
+    rejected: number;
+    queueDepth: number;
+  };
+  hedgehogState: {
+    queueSize: number;
+    accepted: number;
+    rejected: number;
+    drainRate: number;
+  };
+  event?: 'burst' | 'spike' | 'recovery';
+}
+
+// Message flow: 60 updates per second
+ws.send(msgpack.encode(frame));
+```
+
+#### RESTful Endpoints
+
+```typescript
+// Start a new race session
+POST /api/race/start
+Request: {
+  rps: number;
+  duration: number;
+  pattern: 'burst' | 'sustained' | 'chaos' | 'custom';
+  customPattern?: TrafficEvent[];
+}
+Response: { sessionId: string, wsUrl: string }
+
+// Save race for replay
+POST /api/race/save
+Request: { sessionId: string }
+Response: { replayId: string, shareUrl: string }
+
+// Get race replay data
+GET /api/race/:replayId
+Response: {
+  config: RaceConfig,
+  frames: RaceFrame[],
+  winner: string,
+  metrics: PerformanceMetrics
+}
+
+// Traffic pattern library
+GET /api/patterns?difficulty=medium&sort=popular
+POST /api/patterns/create
+Request: {
+  name: string,
+  description: string,
+  events: Array<{time: number, count: number}>
+}
+
+// Leaderboard
+GET /api/leaderboard?pattern=:patternId&limit=10
+POST /api/leaderboard/submit
+Request: { sessionId: string, playerName: string }
+
+// Analytics
+GET /api/stats/algorithms?timeframe=7d
+Response: {
+  tokenBucket: {
+    totalRaces: 1234,
+    winRate: 0.54,
+    avgAcceptanceRate: 0.89,
+    avgLatency: 12.3
+  },
+  leakyBucket: {
+    totalRaces: 1234,
+    winRate: 0.46,
+    avgAcceptanceRate: 0.87,
+    avgLatency: 15.7
+  }
+}
+```
+
+### Visual Design
+
+**Racing Interface Layout:**
+
+```
+┌────────────────────────────────────────┐
+│  [← Back] Algorithm Arena  [Share] [?]  │
+├─────────────┬──────────────────────────┤
+│   Fox 🦊    │    Hedgehog 🦔           │
+│ Token Bucket│   Leaky Bucket           │
+│             │                           │
+│  ┌────────┐ │    ┌────────┐            │
+│  │≈≈≈≈≈≈≈≈│ │    │████    │            │
+│  │≈≈≈≈≈≈≈≈│ │    │████    │            │
+│  │  20/20  │ │    │  8/15  │            │
+│  └────────┘ │    └────────┘            │
+│   Tokens    │     Queue                 │
+│             │                           │
+│ ● ● ● ● ●   │   ● ● ● ○ ○              │
+│ [Particles] │   [Particles]             │
+│             │                           │
+│ Accepted: 45│   Accepted: 42           │
+│ Rejected: 5 │   Rejected: 8            │
+│ Rate: 10/s  │   Rate: 9.8/s            │
+├─────────────┴──────────────────────────┤
+│         Comparative Metrics             │
+│ [Throughput] [Latency] [Fairness]       │
+│  📊 Real-time charts update here        │
+├─────────────────────────────────────────┤
+│ Pattern: [Burst] [DDoS] [Gradual] [→]   │
+│ Duration: [===========|---] 30s/60s     │
+└─────────────────────────────────────────┘
+```
+
+**Visual Elements:**
+- **Token Visualization**: Animated water level for token bucket
+- **Queue Visualization**: Stack representation for leaky bucket
+- **Request Particles**: Flowing particles show accept/reject in real-time
+- **Metrics Graphs**: D3.js powered comparative charts
+- **Timeline Scrubber**: Replay any moment of the race
+
+### Performance Optimizations
+
+#### Worker Pool Management
+
+```typescript
+class WorkerPool {
+  private workers = new Map<string, Worker>();
+  private sharedBuffers = new Map<string, SharedArrayBuffer>();
+
+  constructor() {
+    const cores = navigator.hardwareConcurrency || 4;
+    this.initializeWorkers(Math.min(cores, 4));
+  }
+
+  async processInParallel(
+    algorithm: string,
+    requests: Request[]
+  ): Promise<Results> {
+    const worker = this.getOrCreateWorker(algorithm);
+
+    return new Promise((resolve) => {
+      worker.onmessage = (e) => resolve(e.data);
+      worker.postMessage({
+        type: 'PROCESS_BATCH',
+        requests,
+        buffer: this.sharedBuffers.get(algorithm)
+      });
+    });
+  }
+}
+```
+
+#### Frame Rate Optimization
+
+```typescript
+class RaceRenderer {
+  private lastFrame = 0;
+  private frameSkip = false;
+
+  render(timestamp: number) {
+    const delta = timestamp - this.lastFrame;
+
+    // Target 60fps (16.67ms per frame)
+    if (delta >= 16) {
+      if (!this.frameSkip || delta >= 33) {
+        this.updateParticles(delta);
+        this.renderVisualization();
+        this.lastFrame = timestamp;
+        this.frameSkip = false;
+      } else {
+        this.frameSkip = true; // Skip alternate frames if behind
+      }
+    }
+
+    requestAnimationFrame((t) => this.render(t));
+  }
+}
+```
+
+#### Memory Management
+
+```typescript
+// Object pooling for particles
+class ParticlePool {
+  private pool: Particle[] = [];
+  private active: Set<Particle> = new Set();
+
+  constructor(size: number = 1000) {
+    for (let i = 0; i < size; i++) {
+      this.pool.push(new Particle());
+    }
+  }
+
+  acquire(): Particle | null {
+    const particle = this.pool.pop();
+    if (particle) {
+      this.active.add(particle);
+      return particle;
+    }
+    return null; // Pool exhausted
+  }
+
+  release(particle: Particle) {
+    particle.reset();
+    this.active.delete(particle);
+    this.pool.push(particle);
+  }
+}
+```
+
+### Configuration Constants
+
+```typescript
+// Racing mode specific constants
+const RACE_CONFIG = {
+  // Performance
+  UPDATE_INTERVAL_MS: 16,          // 60fps target
+  WORKER_POOL_SIZE: 4,              // Max parallel workers
+  SHARED_BUFFER_SIZE: 1048576,     // 1MB shared memory
+
+  // Limits
+  MAX_RACE_DURATION_MS: 60000,     // 1 minute max
+  MAX_REQUESTS_PER_SECOND: 1000,   // Prevent DOS
+  PARTICLE_POOL_SIZE: 1000,        // Reusable particles
+
+  // Persistence
+  REPLAY_COMPRESSION: 'brotli',    // 10:1 typical ratio
+  MAX_REPLAY_SIZE_MB: 10,          // Storage limit
+  REPLAY_RETENTION_DAYS: 30,       // Auto-cleanup
+
+  // WebSocket
+  WS_RECONNECT_DELAY_MS: 1000,     // Initial reconnect delay
+  WS_MAX_RECONNECT_DELAY_MS: 30000,// Max backoff
+  WS_PING_INTERVAL_MS: 30000,      // Keep-alive
+
+  // Cache
+  LEADERBOARD_CACHE_TTL_S: 60,     // 1 minute
+  PATTERN_CACHE_TTL_S: 3600,       // 1 hour
+  RACE_CACHE_SIZE: 100              // LRU cache entries
+};
+```
+
+### Progressive Enhancement
+
+```typescript
+// Graceful degradation for older browsers
+class RaceInitializer {
+  async initialize() {
+    const features = {
+      workers: typeof Worker !== 'undefined',
+      sharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+      webgl: this.checkWebGLSupport(),
+      serviceWorker: 'serviceWorker' in navigator
+    };
+
+    if (features.workers && features.sharedArrayBuffer) {
+      // Full performance mode
+      return new WorkerBasedRaceEngine();
+    } else if (features.workers) {
+      // Degraded mode without shared memory
+      return new BasicWorkerRaceEngine();
+    } else {
+      // Fallback to main thread with reduced features
+      console.warn('Running in compatibility mode');
+      return new MainThreadRaceEngine();
+    }
+  }
+
+  private checkWebGLSupport(): boolean {
+    const canvas = document.createElement('canvas');
+    return !!(canvas.getContext('webgl') ||
+             canvas.getContext('experimental-webgl'));
+  }
+}
+```
+
 ## Development Setup
 
 ### Prerequisites
@@ -366,46 +935,70 @@ The frontend SHALL support the following environment variables:
 ### Installation
 
 ```bash
-# Install root dependencies (concurrently for running both servers)
-bun install
+# Install all dependencies for the entire project
+bun install:all
 
-# Install backend dependencies
-cd backend
-bun install
+# Or install individually:
+cd landing && bun install
+cd ../backend && bun install
+cd ../frontend && bun install
+cd ../arena && bun install
+```
 
-# Install frontend dependencies (TypeScript + Vite)
-cd ../frontend
-bun install
+### Database Setup
+
+```bash
+# Initialize the SQLite database
+bun run db:init
+
+# Run migrations
+bun run db:migrate
+
+# Seed with sample data (optional)
+bun run db:seed
 ```
 
 ### Running the Application
 
-**Recommended: Start Both Servers**
+**Full Platform (Recommended):**
 
 From the project root:
 ```bash
-bun run dev:all      # Runs backend + frontend concurrently
+bun run dev:all      # Starts all services: landing, explorer, arena, and backend
 ```
 
-This starts both the Hono backend (port 9000) and Vite frontend (port 5173) simultaneously.
+This launches:
+- Landing page on `http://localhost:5170`
+- Algorithm Explorer on `http://localhost:5173`
+- Algorithm Arena on `http://localhost:5174`
+- Backend API on `http://localhost:9000`
 
-**Alternative: Run Separately**
+**Individual Components:**
 
-If you prefer to run servers in separate terminals:
+Run specific parts of the application:
 
-Backend:
 ```bash
-cd backend
-bun run dev          # Starts Hono server on port 9000 with hot reload
+# Core services
+bun run dev:backend   # API server only (port 9000)
+bun run dev:landing   # Landing page only (port 5170)
+
+# Main applications
+bun run dev:explorer  # Classic UI only (port 5173)
+bun run dev:arena     # Racing mode only (port 5174)
+
+# Combinations
+bun run dev:classic   # Backend + Explorer (original setup)
+bun run dev:racing    # Backend + Arena
 ```
 
-Frontend:
+**Production Build:**
+
 ```bash
-cd frontend
-bun run dev          # Starts Vite dev server
+bun run build:all     # Build all components
+bun run preview:all   # Preview production builds
 ```
 
-Access the application at `http://localhost:5173` (or your chosen frontend port).
+Access the landing page at `http://localhost:5170` to choose your experience, or navigate directly to `/explorer` or `/arena`.
 
 ### CORS
 
@@ -606,6 +1199,49 @@ The frontend intentionally does not handle network failures to maintain focus on
 - Frontend: Bundle with Vite for production
 - Backend: Compile TypeScript to JavaScript
 - Output directories: `frontend/dist`, `backend/dist`
+
+## Dependencies
+
+### Core Runtime & Framework
+- `bun` - All-in-one JavaScript runtime and toolkit
+- `typescript` - Type-safe development
+- `hono` - Lightweight web framework for backend
+- `vite` - Fast frontend bundling and HMR
+
+### Algorithm Explorer Dependencies
+- `@types/node` - Node.js type definitions
+- Standard browser APIs for basic UI
+
+### Algorithm Arena Dependencies
+
+#### Visualization & Animation
+- `d3` - Data-driven visualizations for metrics charts
+- `framer-motion` - Smooth UI animations and transitions
+- `three` - WebGL-based 3D visualizations (optional)
+
+#### Performance & Workers
+- `@hono/websocket` - WebSocket support for real-time updates
+- `comlink` - Seamless Web Worker communication
+- `msgpack` - Binary serialization for efficient data transfer
+
+#### Persistence & Data
+- `bun:sqlite` - Native SQLite support (built into Bun)
+- `brotli` - High-ratio compression for replay data
+
+#### PWA & Offline Support
+- `workbox` - Service Worker toolkit for offline functionality
+- `idb` - Promise-based IndexedDB wrapper
+
+### Development Dependencies
+- `@types/bun` - Bun runtime type definitions
+- `concurrently` - Run multiple dev servers simultaneously
+- `eslint` - Code quality and consistency
+- `prettier` - Code formatting
+
+### Optional Enhancements
+- `chart.js` - Alternative charting library
+- `rxjs` - Reactive programming for complex event streams
+- `zod` - Runtime type validation for API contracts
 
 ## Conformance Requirements
 
