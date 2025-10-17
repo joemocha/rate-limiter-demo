@@ -89,6 +89,15 @@ Bun.serve({
       }
     }
 
+    // SPA fallback - serve index.html for all unmatched routes
+    // This enables client-side routing for /explorer and /arena
+    if (!url.pathname.startsWith('/src/')) {
+      const html = await Bun.file('./index.html').text();
+      return new Response(html, {
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }
+
     return new Response('Not Found', { status: 404 });
   },
 });

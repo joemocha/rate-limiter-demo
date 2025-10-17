@@ -1100,6 +1100,16 @@ The frontend intentionally does not handle network failures to maintain focus on
 ### Design Philosophy
 This demo prioritizes **native APIs over frameworks** to minimize dependencies and maximize educational clarity. Every dependency removed is one less abstraction between the learner and the underlying concepts.
 
+## Implementation Decisions
+
+The following implementation decisions have been established for this project:
+
+1. **Algorithm Priority**: Implement required algorithms first (Token Bucket and Leaky Bucket) before optional algorithms (Fixed Window, Sliding Window, Sliding Log)
+2. **WebSocket API**: Use Bun's native WebSocket API for real-time racing mode communication
+3. **Canvas Performance**: Target 30 FPS for visualization accuracy with smooth rendering
+4. **Test Framework**: Use Bun's built-in test runner for algorithm validation suite
+5. **Native APIs First**: Prefer native browser and Bun APIs over external frameworks and libraries
+
 ## Conformance Requirements
 
 A compliant implementation MUST:

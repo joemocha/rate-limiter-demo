@@ -1,0 +1,341 @@
+.explorer-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.explorer-header {
+  margin-bottom: 2rem;
+}
+
+.back-link {
+  color: #646cff;
+  text-decoration: none;
+  display: inline-block;
+  margin-bottom: 1rem;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.explorer-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 2rem;
+}
+
+/* Config Panel */
+.config-panel {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1.5rem;
+  height: fit-content;
+}
+
+.config-panel h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #333;
+  font-size: 1rem;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #646cff;
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary {
+  background: #646cff;
+  color: white;
+  width: 100%;
+}
+
+.btn-primary:hover {
+  background: #535bf2;
+}
+
+.btn-primary:disabled {
+  background: #444;
+  cursor: not-allowed;
+}
+
+.feedback {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  display: none;
+}
+
+.feedback.success {
+  background: rgba(0, 255, 0, 0.1);
+  border: 1px solid rgba(0, 255, 0, 0.3);
+  color: #0f0;
+}
+
+.feedback.error {
+  background: rgba(255, 0, 0, 0.1);
+  border: 1px solid rgba(255, 0, 0, 0.3);
+  color: #f00;
+}
+
+.current-config {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.current-config h3 {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  color: #aaa;
+}
+
+.current-config div {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* Test Panel */
+.test-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.burst-generator {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.burst-generator h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.burst-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+.btn-secondary {
+  background: #42b883;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #33a372;
+}
+
+.btn-secondary:disabled {
+  background: #444;
+  cursor: not-allowed;
+}
+
+.btn-outline {
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Results Section */
+.results-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #aaa;
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.stat-value.success {
+  color: #0f0;
+}
+
+.stat-value.error {
+  color: #f00;
+}
+
+.visual-indicator {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.progress-bar {
+  height: 40px;
+  display: flex;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.progress-segment {
+  transition: width 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+}
+
+.progress-segment.success {
+  background: #0f0;
+}
+
+.progress-segment.error {
+  background: #f00;
+}
+
+/* Request Log */
+.request-log {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.request-log h3 {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  display: inline-block;
+}
+
+.btn-sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  float: right;
+  background: transparent;
+  color: #ff4444;
+  border: 2px solid #ff4444;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+.btn-sm:hover {
+  background: #ff4444;
+  color: white;
+}
+
+.log-entries {
+  margin-top: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 0.5rem;
+}
+
+.log-empty {
+  text-align: center;
+  color: #888;
+  padding: 2rem;
+}
+
+.log-entry {
+  padding: 0.5rem;
+  margin-bottom: 0.25rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+.log-entry.success {
+  background: rgba(0, 255, 0, 0.1);
+  border-left: 3px solid #0f0;
+}
+
+.log-entry.error {
+  background: rgba(255, 0, 0, 0.1);
+  border-left: 3px solid #f00;
+}
+
+.log-timestamp {
+  color: #888;
+  margin-right: 0.5rem;
+}
+
+.log-status {
+  font-weight: bold;
+  margin-right: 0.5rem;
+}
+
+.log-details {
+  color: #ccc;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .explorer-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .burst-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .burst-controls button {
+    grid-column: span 2;
+  }
+
+  .stats-summary {
+    grid-template-columns: 1fr;
+  }
+}

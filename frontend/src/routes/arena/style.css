@@ -1,0 +1,268 @@
+.arena-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.arena-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.back-link {
+  color: #646cff;
+  text-decoration: none;
+  position: absolute;
+  left: 2rem;
+  top: 2rem;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.race-status {
+  margin-top: 0.5rem;
+  color: #888;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.connection-indicator {
+  font-size: 1.2rem;
+  transition: color 0.3s ease;
+}
+
+.connection-indicator.connected {
+  color: #0f0;
+}
+
+.connection-indicator.disconnected {
+  color: #888;
+}
+
+.connection-indicator.reconnecting {
+  color: #ff0;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.connection-indicator.error {
+  color: #f00;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.arena-layout {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.algorithm-column {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 2rem;
+}
+
+.algorithm-column.fox {
+  border-top: 4px solid #646cff;
+}
+
+.algorithm-column.hedgehog {
+  border-top: 4px solid #42b883;
+}
+
+.algorithm-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.algorithm-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.algorithm-header h2 {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.algorithm-name {
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.visualization-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+canvas {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.viz-label {
+  margin-top: 1rem;
+  font-size: 1rem;
+  color: #aaa;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.metric {
+  text-align: center;
+}
+
+.metric-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+
+.metric-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.metric-value.success {
+  color: #0f0;
+}
+
+.metric-value.error {
+  color: #f00;
+}
+
+.race-controls {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr) auto auto;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 2rem;
+}
+
+.control-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.race-controls button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 2px solid;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+.race-controls button:first-of-type {
+  background-color: #646cff;
+  color: white;
+  border-color: #646cff;
+}
+
+.race-controls button:first-of-type:hover:not(:disabled) {
+  background-color: #535bf2;
+  border-color: #535bf2;
+}
+
+.race-controls button:first-of-type:disabled {
+  background-color: #444;
+  border-color: #444;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.race-controls button:last-of-type {
+  background-color: transparent;
+  color: #ff4444;
+  border-color: #ff4444;
+}
+
+.race-controls button:last-of-type:hover:not(:disabled) {
+  background-color: #ff4444;
+  color: white;
+}
+
+.race-controls button:last-of-type:disabled {
+  background-color: transparent;
+  border-color: #444;
+  color: #444;
+  cursor: not-allowed;
+}
+
+.comparative-metrics {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.comparative-metrics h3 {
+  font-size: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.metric-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.metric-card-label {
+  font-size: 0.9rem;
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+
+.metric-card-value {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .arena-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .race-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .race-controls button {
+    grid-column: span 2;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
