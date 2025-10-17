@@ -24,13 +24,6 @@ This document specifies the requirements for a demo application that illustrates
 
 ```
 /
-├── landing/                          # Landing page for mode selection
-│   ├── index.html                   # Interactive hub page
-│   ├── src/
-│   │   ├── main.ts                  # Landing page logic
-│   │   └── style.css                # Landing page styling
-│   └── tutorial.html                # First-time user guide
-│
 ├── backend/
 │   ├── src/
 │   │   ├── index.ts                 # Hono server entry point
@@ -51,24 +44,33 @@ This document specifies the requirements for a demo application that illustrates
 │   ├── package.json
 │   └── .gitignore
 │
-├── frontend/                         # Algorithm Explorer (existing UI)
+├── frontend/                         # Unified SPA (all routes)
 │   ├── src/
-│   │   ├── main.ts                  # Client-side logic
-│   │   └── style.css                # UI styling
-│   └── index.html                   # Single-page application
-│
-├── arena/                            # Algorithm Arena (racing mode)
-│   ├── src/
-│   │   ├── main.ts                  # Racing visualization logic
-│   │   ├── workers/                 # Web Workers for computation
-│   │   │   ├── simulation-worker.ts # Algorithm simulation
-│   │   │   └── metrics-worker.ts    # Metrics calculation
-│   │   ├── visualizations/          # D3/Canvas components
-│   │   │   ├── race-track.ts        # Main racing visualization
-│   │   │   └── particles.ts         # Request particle system
-│   │   └── style.css                # Arena styling
-│   ├── index.html                   # Racing interface
-│   └── service-worker.ts            # Offline support & caching
+│   │   ├── routes/
+│   │   │   ├── landing/             # Landing page components (/)
+│   │   │   │   ├── index.ts
+│   │   │   │   └── style.css
+│   │   │   ├── explorer/            # Algorithm Explorer (/explorer)
+│   │   │   │   ├── index.ts
+│   │   │   │   └── style.css
+│   │   │   └── arena/               # Algorithm Arena (/arena)
+│   │   │       ├── index.ts
+│   │   │       ├── workers/         # Web Workers for computation
+│   │   │       │   ├── simulation-worker.ts
+│   │   │       │   └── metrics-worker.ts
+│   │   │       ├── visualizations/  # D3/Canvas components
+│   │   │       │   ├── race-track.ts
+│   │   │       │   └── particles.ts
+│   │   │       └── style.css
+│   │   ├── shared/
+│   │   │   ├── router.ts            # Client-side routing (History API)
+│   │   │   ├── config-service.ts    # Shared configuration state
+│   │   │   └── types.ts
+│   │   ├── main.ts                  # App entry point
+│   │   └── style.css                # Global styles
+│   ├── index.html                   # Single entry point
+│   ├── service-worker.ts            # Offline support & caching
+│   └── package.json
 │
 └── README.md
 ```
@@ -325,15 +327,17 @@ The backend SHALL support the following environment variables:
 ### Frontend Configuration
 The frontend SHALL support the following environment variables:
 - `VITE_API_URL`: Backend API base URL (default: http://localhost:9000)
-- `VITE_PORT`: Frontend dev server port (default: 5173)
 
 ## Landing Page & Navigation
 
 ### Route Structure
+
+The frontend is a single-page application (SPA) using client-side routing (History API):
 - `/` - Landing page with mode selection
-- `/explorer` - Classic single-algorithm tester (existing UI)
+- `/explorer` - Classic single-algorithm tester
 - `/arena` - Algorithm racing visualization
-- `/tutorial` - First-time user interactive tour
+
+All routes are served from `http://localhost:5173` with navigation handled client-side via `router.navigate()` for seamless transitions without page reloads.
 
 ### Landing Page Design
 
@@ -356,8 +360,6 @@ The landing page embodies the Fox vs Hedgehog philosophy through interactive cho
 │                                        │
 │  [Enter Explorer →]       [Enter Arena →]   │
 │                                        │
-├──────────────────────────────────────┤
-│ 🎓 New here? [Start Tutorial]         │
 └──────────────────────────────────────┘
 ```
 
@@ -374,13 +376,11 @@ interface NavigationState {
   };
 }
 
-// On page load
+// On page load - auto-navigate to last visited mode
 const navState = localStorage.getItem('navState');
-if (!navState || navState.visitCount === 0) {
-  showTutorial();
-} else if (navState.lastVisited) {
-  // Auto-redirect after 2s with cancel option
-  redirectWithDelay(navState.lastVisited);
+if (navState && navState.lastVisited) {
+  // Auto-navigate after 2s with cancel option
+  navigateWithDelay(`/${navState.lastVisited}`);
 }
 ```
 
@@ -402,7 +402,7 @@ class SharedConfigService {
     this.listeners.push(listener);
   }
 
-  // Settings persist across mode switches
+  // Settings persist across mode switches (in-memory + localStorage)
   updateRPS(value: number) {
     this.config.rps = value;
     this.broadcast();
@@ -410,6 +410,81 @@ class SharedConfigService {
   }
 }
 ```
+
+### Client-Side Router Implementation
+
+The router uses the History API for seamless navigation without page reloads:
+
+```typescript
+// frontend/src/shared/router.ts
+class Router {
+  private routes: Map<string, () => void> = new Map();
+  private currentRoute: string = '/';
+
+  constructor() {
+    // Handle browser back/forward
+    window.addEventListener('popstate', () => this.handleRoute());
+
+    // Intercept link clicks
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'A' && target.getAttribute('data-route')) {
+        e.preventDefault();
+        this.navigate(target.getAttribute('data-route')!);
+      }
+    });
+  }
+
+  register(path: string, handler: () => void) {
+    this.routes.set(path, handler);
+  }
+
+  navigate(path: string) {
+    window.history.pushState({}, '', path);
+    this.handleRoute();
+  }
+
+  private handleRoute() {
+    const path = window.location.pathname;
+    const handler = this.routes.get(path);
+
+    if (handler) {
+      this.currentRoute = path;
+      handler();
+    } else {
+      // 404 fallback
+      this.navigate('/');
+    }
+  }
+}
+
+// Usage in main.ts
+const router = new Router();
+
+router.register('/', () => {
+  // Render landing page
+  document.getElementById('app').innerHTML = renderLanding();
+});
+
+router.register('/explorer', () => {
+  // Render explorer UI
+  document.getElementById('app').innerHTML = renderExplorer();
+});
+
+router.register('/arena', () => {
+  // Render arena UI
+  document.getElementById('app').innerHTML = renderArena();
+});
+
+// Initial route
+router.handleRoute();
+```
+
+**Navigation Best Practices:**
+- Use `<a data-route="/explorer">` for internal links (router intercepts)
+- Call `router.navigate()` for programmatic navigation
+- Shared state persists across route changes (in-memory singleton)
+- Use `history.replaceState()` for redirects without history entry
 
 ## Algorithm Explorer (Classic Mode)
 
@@ -939,10 +1014,8 @@ class RaceInitializer {
 bun install:all
 
 # Or install individually:
-cd landing && bun install
-cd ../backend && bun install
+cd backend && bun install
 cd ../frontend && bun install
-cd ../arena && bun install
 ```
 
 ### Database Setup
@@ -964,13 +1037,11 @@ bun run db:seed
 
 From the project root:
 ```bash
-bun run dev:all      # Starts all services: landing, explorer, arena, and backend
+bun run dev:all      # Starts backend + frontend SPA
 ```
 
 This launches:
-- Landing page on `http://localhost:5170`
-- Algorithm Explorer on `http://localhost:5173`
-- Algorithm Arena on `http://localhost:5174`
+- Frontend SPA on `http://localhost:5173` (all routes)
 - Backend API on `http://localhost:9000`
 
 **Individual Components:**
@@ -978,17 +1049,9 @@ This launches:
 Run specific parts of the application:
 
 ```bash
-# Core services
+# Individual services
 bun run dev:backend   # API server only (port 9000)
-bun run dev:landing   # Landing page only (port 5170)
-
-# Main applications
-bun run dev:explorer  # Classic UI only (port 5173)
-bun run dev:arena     # Racing mode only (port 5174)
-
-# Combinations
-bun run dev:classic   # Backend + Explorer (original setup)
-bun run dev:racing    # Backend + Arena
+bun run dev:frontend  # Frontend SPA only (port 5173)
 ```
 
 **Production Build:**
@@ -998,7 +1061,7 @@ bun run build:all     # Build all components
 bun run preview:all   # Preview production builds
 ```
 
-Access the landing page at `http://localhost:5170` to choose your experience, or navigate directly to `/explorer` or `/arena`.
+Access the application at `http://localhost:5173`. The landing page (`/`) allows you to choose your experience, or navigate directly to `/explorer` or `/arena`.
 
 ### CORS
 
@@ -1208,11 +1271,17 @@ The frontend intentionally does not handle network failures to maintain focus on
 - `hono` - Lightweight web framework for backend
 - `vite` - Fast frontend bundling and HMR
 
-### Algorithm Explorer Dependencies
+### Frontend Dependencies
+
+#### Core SPA Infrastructure
+- Vanilla TypeScript History API for client-side routing (no library needed)
+- Standard browser APIs for navigation and state management
+
+#### Explorer Route (`/explorer`)
 - `@types/node` - Node.js type definitions
 - Standard browser APIs for basic UI
 
-### Algorithm Arena Dependencies
+#### Arena Route (`/arena`)
 
 #### Visualization & Animation
 - `d3` - Data-driven visualizations for metrics charts
