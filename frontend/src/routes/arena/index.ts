@@ -26,6 +26,15 @@ let raceConfig: { rps: number; duration: number; pattern: string; foxAlgorithm: 
 let healthCheckIntervalId: number | null = null;
 const HEALTH_CHECK_ENABLED = false; // Set to true to enable periodic health checks
 
+// History for 1-second moving average rate calculation
+interface RateHistoryPoint {
+  timestamp: number;
+  accepted: number;
+}
+const foxHistory: RateHistoryPoint[] = [];
+const hedgehogHistory: RateHistoryPoint[] = [];
+const RATE_WINDOW_MS = 1000; // 1 second window
+
 export function renderArena(): string {
   return `
     <div class="arena-container">
@@ -340,6 +349,10 @@ function handleStartRace(): void {
   hedgehogState = { accepted: 0, rejected: 0 };
   reconnectAttempts = 0;
 
+  // Clear history arrays for new race
+  foxHistory.length = 0;
+  hedgehogHistory.length = 0;
+
   // Update UI
   isRacing = true;
   startBtn.disabled = true;
@@ -465,6 +478,16 @@ function updateMetricsDisplay(): void {
   if (hedgehogAcceptedEl) hedgehogAcceptedEl.textContent = hedgehogState.accepted.toString();
   if (hedgehogRejectedEl) hedgehogRejectedEl.textContent = hedgehogState.rejected.toString();
 
+  // Calculate and display rates
+  const foxRate = calculateMovingAverageRate(foxHistory);
+  const hedgehogRate = calculateMovingAverageRate(hedgehogHistory);
+
+  const foxRateEl = document.getElementById('fox-rate');
+  const hedgehogRateEl = document.getElementById('hedgehog-rate');
+
+  if (foxRateEl) foxRateEl.textContent = `${foxRate.toFixed(1)}/s`;
+  if (hedgehogRateEl) hedgehogRateEl.textContent = `${hedgehogRate.toFixed(1)}/s`;
+
   // Throughput percentages
   const foxTotal = foxState.accepted + foxState.rejected;
   const hedgehogTotal = hedgehogState.accepted + hedgehogState.rejected;
@@ -501,6 +524,22 @@ function updateWinnerDisplay(): void {
     winnerEl.textContent = 'Tie';
     winnerEl.style.color = '#888';
   }
+}
+
+function calculateMovingAverageRate(history: RateHistoryPoint[]): number {
+  const now = Date.now();
+
+  // Filter to last 1 second
+  const recent = history.filter(p => now - p.timestamp <= RATE_WINDOW_MS);
+
+  if (recent.length < 2) return 0;
+
+  const oldest = recent[0];
+  const newest = recent[recent.length - 1];
+  const deltaRequests = newest.accepted - oldest.accepted;
+  const deltaTime = (newest.timestamp - oldest.timestamp) / 1000; // seconds
+
+  return deltaTime > 0 ? deltaRequests / deltaTime : 0;
 }
 
 // Connection status helper functions
@@ -598,6 +637,18 @@ function connectWebSocket(rps: number, duration: number, pattern: string, foxAlg
             accepted: frame.hedgehogState.accepted,
             rejected: frame.hedgehogState.rejected,
           };
+
+          // Push data points to history for rate calculation
+          const now = Date.now();
+          foxHistory.push({ timestamp: now, accepted: foxState.accepted });
+          hedgehogHistory.push({ timestamp: now, accepted: hedgehogState.accepted });
+
+          // Clean old history to prevent unbounded growth (keep last 2 seconds)
+          const cutoff = now - (RATE_WINDOW_MS * 2);
+          const foxCutIndex = foxHistory.findIndex(p => p.timestamp > cutoff);
+          const hedgehogCutIndex = hedgehogHistory.findIndex(p => p.timestamp > cutoff);
+          if (foxCutIndex > 0) foxHistory.splice(0, foxCutIndex);
+          if (hedgehogCutIndex > 0) hedgehogHistory.splice(0, hedgehogCutIndex);
           break;
 
         case 'race-stopped':
